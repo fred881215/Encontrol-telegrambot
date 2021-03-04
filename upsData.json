@@ -1,0 +1,40 @@
+{
+    "connect": "/dev/ttyUSB0 (左)",
+    "ups_Life": "onLine(在線)",
+    "input": {
+        "inputLine": 1,
+        "inputFreq": 59.9,
+        "inputVolt": 214.0
+    },
+    "output": {
+        "systemMode": "Normal",
+        "outputLine": 1,
+        "outputFreq": 59.9,
+        "outputVolt": 221.0,
+        "outputAmp": 21.0543,
+        "outputWatt": 4.653,
+        "outputPercent": 55
+    },
+    "battery": {
+        "status": {
+            "batteryHealth": "Good (良好)",
+            "batteryStatus": "OK (良好)",
+            "batteryCharge_Mode": "Boost charging (快速充電)",
+            "batteryRemain_Min": "None By Charging (充電中)",
+            "batteryRemain_Sec": "None By Charging (充電中)",
+            "batteryVolt": 272,
+            "batteryTemp": 34,
+            "batteryRemain_Percent": 100
+        },
+        "lastChange": {
+            "lastBattery_Year": 2017,
+            "lastBattery_Mon": 3,
+            "lastBattery_Day": 22
+        },
+        "nextChange": {
+            "nextBattery_Year": 2020,
+            "nextBattery_Mon": 3,
+            "nextBattery_Day": 22
+        }
+    }
+}

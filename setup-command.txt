@@ -1,0 +1,30 @@
+[Rebuild Project Envoriment]
+mkdir $Project-Name
+cd $Project-Name
+pipenv install --three python-telegram-bot flask gunicorn requests pymongo flask-api dnspython
+> create new python code file (name like python3)
+pipenv run python3 app.py
+
+[Mongodb Pre Setup Command]
+mongo
+use admin;
+db.createUser({user: "imac", pwd: "imacuser", roles: [{role: "userAdminAnyDatabase", db: "admin"}]});
+exit
+mongo -u imac -p --authenticationDatabase admin
+use smart-data-center
+db.createUser({user: "imac", pwd: "imacuser", roles: [{role: "dbOwner", db: "smart-data-center"}]});
+
+[Heroku Setup]
+curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
+heroku login -i
+cd $Project-Name
+git init
+git add .
+git commit -am "make it better"
+git push heroku master
+
+[Procfile]
+${Name}
+"app" ==> app.py
+"main" ==> main.py
+web: gunicorn ${Name}:app --log-file -

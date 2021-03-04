@@ -1,0 +1,31 @@
+[TELEGRAM]                                                                                                                                       
+ACCESS_TOKEN = telegram-bot-token
+GROUP_ID = dev-group-telegram-id  
+DEV_USER_ID = dev-user-telegram-id                                                                                                                          
+                                                                                                                                                  
+[MONGODB]                                                                                                                                         
+SERVER_PROTOCOL = mongodb+srv                                                                                                                     
+SERVER = mlab-mongodb-server
+SERVER_IP = local-mongodb-server-ip
+USER = username                                                                                                                                       
+PASSWORD = password
+
+[HEROKU]      
+SERVER_PROTOCOL = https                                                                                                                                         
+SERVER = xxxx-xxxx-xxxx.herokuapp.com 
+
+[MYSQL]
+SERVER_IP = local-mysql-ip
+SERVER_PORT = 3306
+USER = local-mysql-user
+PASSWORD = local-mysql-password
+DATABASE = local-mysql-databases
+
+[DEVICE]                                                                                                                                          
+DL303_OWNER = dl303-owner-telegram-id
+ET7044_OWNER = et7044-owner-telegram-id
+UPS_OWNER = ups-owner-telegram-id
+AIR_CONDICTION_OWNER = air-condiction-owner-telegram-id
+
+[LINE]
+SERVER = xxxx-xxxx-xxxx.herokuapp.com 
