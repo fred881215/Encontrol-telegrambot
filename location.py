@@ -26,6 +26,7 @@ myMongoDb = myMongoClient["smart-data-center"]
 # 攝影功能
 dbCameraControl = myMongoDb['cameraControl']
 dbCameraCreate = myMongoDb['cameraCreate']
+dbArchiveRequest = myMongoDb['archiveRequest']
 
 # imgur 圖床設置
 client_id = 'b0ab73e0ddc8fc4'
@@ -151,8 +152,58 @@ def main():
                     # 使用者請求清空, 連線狀態更改為異常(1)
                     dbCameraControl.update_one({"device_number":camera["device_number"]}, {"$set":{"status":"0", "video_second":"", "chat_id":"", "connection":"1"}}, upsert=True)
                     bot.send_message(chat_id=camera["chat_id"], text=respText, parse_mode="Markdown")
+    # 客戶端調取影片檔請求
+    def func_ArchiveRequest():
+        print("=====ArchiveRequest=====")
+        requests = dbArchiveRequest.find()
+        for request in requests:
+            if request["status"] == "1":
+                print("-----" + request["device_number"] + "-----")
+                # 分割影片日期與時間
+                archive_date = request["archive_date"].split(":")[0]
+                archive_hour = request["archive_date"].split(":")[1]
+                # 透過使用者請求的日期特定掛載的網路硬碟資料夾內容
+                all_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date)
+                video_list = []
+                for video_file in all_video_list:
+                    if archive_hour == video_file.split("-")[2][0:2]:
+                        video_list.append(video_file.split("-")[2])
+                if len(video_list) != 0:
+                    respText = "請選擇影片存檔～"
+                    bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(video_name, callback_data = "archive_check:" + video_name + ":" + str(request["chat_id"]))] for video_name in video_list
+                    ]), parse_mode="Markdown")
+                else:
+                    respText = "該時段沒有存檔～"
+                    bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
+                dbArchiveRequest.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0"}}, upsert=True)
+            elif request["status"] == "2":
+                def archive_job(chat_id, video_path):
+                    # 回傳錄像給使用者
+                    try:
+                        bot.send_video(chat_id=chat_id, video=open(video_path, 'rb'))
+                    # 回傳失敗代表檔案大小超過Telegram最大限制, 改傳文字訊息
+                    except:
+                        respText = "該存檔無法傳送, 請選擇其他時段～"
+                        bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
+                print("-----" + request["device_number"] + "-----")
+                # 分隔使用者請求的錄影日期(如20200202AM)
+                archive_date = request["archive_date"].split(":")[0]
+                # 特定使用者請求的攝像機與錄影日期資料夾
+                all_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date)
+                # 搜尋資料夾內符合使用者請求的檔名
+                for video_file in all_video_list:
+                    if request["video_name"] == video_file.split("-")[2]:
+                        file_name = video_file
+                # 將找到的檔名和上層路徑組合成檔案的絕對路徑
+                video_path = "//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date + "/" + file_name
+                # 平行處理
+                _thread.start_new_thread(archive_job, (request["chat_id"], video_path))
+                # 使用者請求清空
+                dbArchiveRequest.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0", "device_number":"", "archive_date":"", "video_name":""}}, upsert=True)
     func_CameraCreate()
     func_CameraControl()
+    func_ArchiveRequest()
 main()
 
 # 定時檢測, 每隔 10 秒執行 一次
