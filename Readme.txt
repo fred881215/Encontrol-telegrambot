@@ -1,6 +1,5 @@
 Heroku 帳號@gmail, 密碼加點:a056966155.
 
-sudo apt install ffmpeg
 pip install python-telegram-bot
 pip install pymongo
 pip install dnspython
