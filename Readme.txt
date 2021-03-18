@@ -1,5 +1,14 @@
 Heroku 帳號@gmail, 密碼加點:a056966155.
 
+sudo apt install ffmpeg
+pip install python-telegram-bot
+pip install pymongo
+pip install dnspython
+pip install opencv-python
+pip install imgurpython
+pip install pyimgur
+pip install schedule
+
 Telegram 網路 NFS 硬碟掛載(已白名單之機房電腦可連線)
   !Sysnology NAS 設定:
     IP: 10.0.0.73:5000
