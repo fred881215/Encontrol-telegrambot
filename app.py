@@ -1314,7 +1314,7 @@ def archive_day(bot,update):
                 InlineKeyboardButton(str(count_day+1) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+1)),
                 InlineKeyboardButton(str(count_day+2) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+2))] for count_day in range(min_day, max_day+1) if count_day in [21, 24, 27]
         ]), parse_mode="Markdown")
-    # 如果最大日期等於31, 設定一列6個按鈕
+    # 如果最大日期等於31, 設定一列6個按鈕, 二列5個按鈕
     elif max_day == 31:
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton('21' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '21'),
