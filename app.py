@@ -1317,12 +1317,17 @@ def archive_day(bot,update):
     # 如果最大日期等於31, 設定一列6個按鈕
     elif max_day == 31:
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(str(count_day) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day)),
-                InlineKeyboardButton(str(count_day+1) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+1)),
-                InlineKeyboardButton(str(count_day+2) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+2)),
-                InlineKeyboardButton(str(count_day+3) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+3)),
-                InlineKeyboardButton(str(count_day+4) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+4)),
-                InlineKeyboardButton(str(count_day+5) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+5))] for count_day in range(min_day, max_day+1) if count_day in [21, 27]
+            [InlineKeyboardButton('21' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '21'),
+                InlineKeyboardButton('22' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '22'),
+                InlineKeyboardButton('23' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '23'),
+                InlineKeyboardButton('24' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '24'),
+                InlineKeyboardButton('25' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '25'),
+                InlineKeyboardButton('26' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '26')],
+            [InlineKeyboardButton('27' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '27'),
+                InlineKeyboardButton('28' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '28'),
+                InlineKeyboardButton('29' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '29'),
+                InlineKeyboardButton('30' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '30'),
+                InlineKeyboardButton('31' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '31')]
         ]), parse_mode="Markdown")
     # 其他日期設定一列5個按鈕
     else:
@@ -1345,8 +1350,8 @@ def archive_apm(bot,update):
     if len(day) == 1:
         # 在單日前面補0
         day = "0" + day
-    # 如果日期數字不符規範(<=32)或大於當前年月日, 回傳錯誤訊息
-    if day == "32" or year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1] and int(day) > int(str(datetime.date.today()).split("-")[2]):
+    # 如果日期數字大於當前年月日, 回傳錯誤訊息
+    if year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1] and int(day) > int(str(datetime.date.today()).split("-")[2]):
         respText = "此日期超過可檢索範圍, 請確認後重新嘗試～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         return
