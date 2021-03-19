@@ -1,6 +1,5 @@
 import telegram
-from telegram.ext import Updater, Dispatcher, MessageHandler, Filters, CallbackQueryHandler, ConversationHandler, CommandHandler
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
 from imgurpython import ImgurClient
 import pyimgur
@@ -10,7 +9,6 @@ import time
 import cv2
 import os
 import schedule
-import ossaudiodev
 import _thread
 import socket
 
@@ -165,24 +163,35 @@ def main():
                 # 透過使用者請求的日期特定掛載的網路硬碟資料夾內容
                 all_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date)
                 video_list = []
+                # 迴圈掃描所有資料夾內的影片檔
                 for video_file in all_video_list:
+                    # 如果檔名符合使用者請求的時間
                     if archive_hour == video_file.split("-")[2][0:2]:
-                        video_list.append(video_file.split("-")[2])
+                        # 檢查影片檔的大小是否符合Telegram bot Api的傳輸限制(最大不可超過50MB)
+                        file_size = os.path.getsize("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date + "/" + video_file)
+                        # 如果影片檔小於50MB則將檔名加入選擇清單
+                        if file_size < 50000000:
+                            video_list.append(video_file.split("-")[2])
+                # 如果選擇清單不為空
                 if len(video_list) != 0:
                     respText = "請選擇影片存檔～"
+                    # 傳送選擇清單給使用者
                     bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(video_name, callback_data = "archive_check:" + video_name + ":" + str(request["chat_id"]))] for video_name in video_list
+                        [InlineKeyboardButton(video_name, callback_data = "archive_check:" +  request["device_number"] + ":" + request["archive_date"] + ":" + video_name + ":" + str(request["chat_id"]))] for video_name in video_list
                     ]), parse_mode="Markdown")
+                # 如果選擇清單為空
                 else:
                     respText = "該時段沒有存檔～"
+                    # 傳送提示文字給使用者
                     bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
+                # 使用者請求清空
                 dbArchiveRequest.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0"}}, upsert=True)
             elif request["status"] == "2":
                 def archive_job(chat_id, video_path):
                     # 回傳錄像給使用者
                     try:
                         bot.send_video(chat_id=chat_id, video=open(video_path, 'rb'))
-                    # 回傳失敗代表檔案大小超過Telegram最大限制, 改傳文字訊息
+                    # 回傳失敗時發送錯誤訊息
                     except:
                         respText = "該存檔無法傳送, 請選擇其他時段～"
                         bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
