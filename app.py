@@ -1179,69 +1179,10 @@ def archive_month(bot,update):
         # 取最大月份(12)
         max_month = 12
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(count_month) + "月", callback_data = "archive_day_range:" + device + ":" + year + ":" + str(count_month)),
-            InlineKeyboardButton(str(count_month+1) + "月", callback_data = "archive_day_range:" + device + ":" + year + ":" + str(count_month+1)),
-            InlineKeyboardButton(str(count_month+2) + "月", callback_data = "archive_day_range:" + device + ":" + year + ":" + str(count_month+2)),
-            InlineKeyboardButton(str(count_month+3) + "月", callback_data = "archive_day_range:" + device + ":" + year + ":" + str(count_month+3))] for count_month in range(1, max_month+1) if count_month in [1, 5, 9]
-    ]), parse_mode="Markdown")
-    return
-
-# 調取存檔(日期範圍) 按鈕鍵盤 callback
-def archive_day_range(bot,update):
-    device = update.callback_query.data.split(':')[1]
-    year = update.callback_query.data.split(':')[2]
-    month = update.callback_query.data.split(':')[3]
-    # 如果月份數字小於十位數且未補0(date.today的日期格式為2020-01-01, 不是2020-1-1)
-    if len(month) == 1:
-        # 在單月前面補0
-        month = "0" + month
-    respText = "請選擇影片存檔日期範圍～"
-    # 如果傳過來的年月份是當前年月份
-    if year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1]:
-        # 取當前最大日期
-        max_day = int(str(datetime.date.today()).split("-")[2])
-        # 依當前最大日期設定陣列資料
-        if max_day <= 10:
-            day_range_list = ["1"]
-            min_day_list = ["1"]
-            max_day_list = []
-            max_day_list.append(str(max_day))
-        elif max_day <= 20:
-            day_range_list = ["1", "2"]
-            min_day_list = ["1", "11"]
-            max_day_list = ["10"]
-            max_day_list.append(str(max_day))
-        elif max_day > 20:
-            day_range_list = ["1", "2", "3"]
-            min_day_list = ["1", "11", "21"]
-            max_day_list = ["10", "20"]
-            max_day_list.append(str(max_day))
-    # 如果資料是當年年份卻大於當前月份
-    elif year == str(datetime.date.today()).split("-")[0] and int(month) > int(str(datetime.date.today()).split("-")[1]):
-        respText = "此年月份超過可檢索範圍, 請確認後重新嘗試～"
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
-        return
-    # 如果資料不是當前年月份
-    else:
-        # 如果月份為大
-        if int(month) in [1,3,5,7,8,10,12]:
-            max_day = "31"
-        # 如果月份為小
-        elif int(month) in [4,6,9,11]:
-            max_day = "30"
-        # 如果月份為二
-        else:
-            # 如果為閏年
-            if int(year)%4 == 0:
-                max_day = "29"
-            # 如果非閏年
-            else:
-                max_day = "28"
-        day_range_list = ["1", "2", "3"]
-        min_day_list = ["1", "11", "21"]
-        max_day_list = ["10", "20", max_day]
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(min_day + '-' + max_day, callback_data = "archive_day:" + device + ":" + year + ":" + month + ":" + day_range)] for day_range, min_day, max_day in zip(day_range_list, min_day_list, max_day_list)
+        [InlineKeyboardButton(str(count_month) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month)),
+            InlineKeyboardButton(str(count_month+1) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+1)),
+            InlineKeyboardButton(str(count_month+2) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+2)),
+            InlineKeyboardButton(str(count_month+3) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+3))] for count_month in range(1, max_month+1) if count_month in [1, 5, 9]
     ]), parse_mode="Markdown")
     return
 
@@ -1250,94 +1191,47 @@ def archive_day(bot,update):
     device = update.callback_query.data.split(':')[1]
     year = update.callback_query.data.split(':')[2]
     month = update.callback_query.data.split(':')[3]
-    day_range = update.callback_query.data.split(':')[4]
+    # 如果月份數字小於十位數且未補0(date.today的日期格式為2020-01-01, 不是2020-1-1)
+    if len(month) == 1:
+        # 在單月前面補0
+        month = "0" + month
     respText = "請選擇影片存檔日期～"
-    # 如果傳過來的年月份是當前年月份
-    if year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1]:
-        # 依日期範圍決定最小日期
-        if day_range == "1":
-            min_day = 1
-            # 如果當前日期比日期範圍最大值要小
-            if int(str(datetime.date.today()).split("-")[2]) <= 10:
-                # 設定日期範圍最大值為當前日期
-                max_day = int(str(datetime.date.today()).split("-")[2])
-            # 否則日期範圍最大值為預設值
-            else:
-                max_day = 10
-        elif day_range == "2":
-            min_day = 11
-            if int(str(datetime.date.today()).split("-")[2]) <= 20:
-                max_day = int(str(datetime.date.today()).split("-")[2])
-            else:
-                max_day = 20
-        elif day_range == "3":
-            min_day = 21
-            # 取當前最大日期
-            max_day = int(str(datetime.date.today()).split("-")[2])
-    # 如果資料非當前年月份
+    # 如果月份數字大於當前年月日, 回傳錯誤訊息
+    if year == str(datetime.date.today()).split("-")[0] and int(month) > int(str(datetime.date.today()).split("-")[1]):
+        respText = "此月份超過可檢索範圍, 請確認後重新嘗試～"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        return
     else:
-        # 依日期範圍決定最小日期和最大日期
-        if day_range == "1":
-            min_day = 1
-            max_day = 10
-        elif day_range == "2":
-            min_day = 11
-            max_day = 20
-        elif day_range == "3":
-            min_day = 21
-            # 如果月份為大
-            if int(month) in [1,3,5,7,8,10,12]:
-                max_day = 31
-            # 如果月份為小
-            elif int(month) in [4,6,9,11]:
-                max_day = 30
-            # 如果月份為二
+        # 如果月份為大
+        if int(month) in [1,3,5,7,8,10,12]:
+            max_day = [day for day in range(1, 31+1)]
+            # 增加空值補齊日期按鈕
+            for i in range(1, 10):
+                max_day.append(' ')
+        # 如果月份為小
+        elif int(month) in [4,6,9,11]:
+            max_day = [day for day in range(1, 30+1)]
+            for i in range(1, 10):
+                max_day.append(' ')
+        # 如果月份為二
+        else:
+            # 如果為閏年
+            if int(year)%4 == 0:
+                max_day = [day for day in range(1, 29+1)]
+                for i in range(1, 10):
+                    max_day.append(' ')
+            # 如果非閏年
             else:
-                # 如果為閏年
-                if int(year)%4 == 0:
-                    max_day = 29
-                # 如果非閏年
-                else:
-                    max_day = 28
-    # 如果最大日期等於28, 設定一列4個按鈕
-    if  max_day == 28:
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(str(count_day) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day)),
-                InlineKeyboardButton(str(count_day+1) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+1)),
-                InlineKeyboardButton(str(count_day+2) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+2)),
-                InlineKeyboardButton(str(count_day+3) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+3))] for count_day in range(min_day, max_day+1) if count_day in [21, 25]
-        ]), parse_mode="Markdown")
-    # 如果最大日期等於29, 設定一列3個按鈕
-    elif  max_day == 29:
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(str(count_day) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day)),
-                InlineKeyboardButton(str(count_day+1) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+1)),
-                InlineKeyboardButton(str(count_day+2) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+2))] for count_day in range(min_day, max_day+1) if count_day in [21, 24, 27]
-        ]), parse_mode="Markdown")
-    # 如果最大日期等於31, 設定一列6個按鈕, 二列5個按鈕
-    elif max_day == 31:
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton('21' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '21'),
-                InlineKeyboardButton('22' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '22'),
-                InlineKeyboardButton('23' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '23'),
-                InlineKeyboardButton('24' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '24'),
-                InlineKeyboardButton('25' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '25'),
-                InlineKeyboardButton('26' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '26')],
-            [InlineKeyboardButton('27' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '27'),
-                InlineKeyboardButton('28' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '28'),
-                InlineKeyboardButton('29' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '29'),
-                InlineKeyboardButton('30' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '30'),
-                InlineKeyboardButton('31' + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + '31')]
-        ]), parse_mode="Markdown")
-    # 其他日期設定一列5個按鈕
-    else:
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(str(count_day) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day)),
-                InlineKeyboardButton(str(count_day+1) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+1)),
-                InlineKeyboardButton(str(count_day+2) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+2)),
-                InlineKeyboardButton(str(count_day+3) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+3)),
-                InlineKeyboardButton(str(count_day+4) + '日', callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(count_day+4))] for count_day in range(min_day, max_day+1) if count_day in [1, 6, 11, 16, 21, 26]
-        ]), parse_mode="Markdown")
+                max_day = [day for day in range(1, 28+1)]
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton(str(max_day[i]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i])),
+            InlineKeyboardButton(str(max_day[i+1]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+1])),
+            InlineKeyboardButton(str(max_day[i+2]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+2])),
+            InlineKeyboardButton(str(max_day[i+3]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+3])),
+            InlineKeyboardButton(str(max_day[i+4]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+4])),
+            InlineKeyboardButton(str(max_day[i+5]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+5])),
+            InlineKeyboardButton(str(max_day[i+6]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+6]))] for i in range(0, len(max_day)) if i in [0, 7, 14, 21, 28]
+    ]), parse_mode="Markdown")
     return
 
 # 調取存檔(時間範圍) 按鈕鍵盤 callback
@@ -1353,6 +1247,11 @@ def archive_apm(bot,update):
     # 如果日期數字大於當前年月日, 回傳錯誤訊息
     if year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1] and int(day) > int(str(datetime.date.today()).split("-")[2]):
         respText = "此日期超過可檢索範圍, 請確認後重新嘗試～"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        return
+    # 如果日期為0+空白, 回傳錯誤訊息
+    elif day == '0 ':
+        respText = "此按鈕不可選取, 請確認後重新嘗試～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         return
     respText = "請選擇影片存檔時段～"
@@ -1455,7 +1354,6 @@ updater.dispatcher.add_handler(CallbackQueryHandler(camera_select, pattern=r'cam
 updater.dispatcher.add_handler(CallbackQueryHandler(camera_request, pattern=r'camera_select'))
 updater.dispatcher.add_handler(CallbackQueryHandler(video_second, pattern=r'video_second'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_month, pattern=r'archive_month'))
-updater.dispatcher.add_handler(CallbackQueryHandler(archive_day_range, pattern=r'archive_day_range'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_day, pattern=r'archive_day'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_apm, pattern=r'archive_apm'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_hour, pattern=r'archive_hour'))
