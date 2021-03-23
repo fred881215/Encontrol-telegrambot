@@ -162,22 +162,31 @@ def main():
                 archive_hour = request["archive_date"].split(":")[1]
                 # 透過使用者請求的日期特定掛載的網路硬碟資料夾內容
                 all_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date)
+                # 設定暫存清單
                 video_list = []
+                show_list = []
                 # 迴圈掃描所有資料夾內的影片檔
                 for video_file in all_video_list:
                     # 如果檔名符合使用者請求的時間
                     if archive_hour == video_file.split("-")[2][0:2]:
                         # 檢查影片檔的大小是否符合Telegram bot Api的傳輸限制(最大不可超過50MB)
                         file_size = os.path.getsize("//mnt/telegram/2706_" + request["device_number"] + "/" + archive_date + "/" + video_file)
-                        # 如果影片檔小於50MB則將檔名加入選擇清單
+                        # 如果影片檔小於50MB將檔名加入video_list, 顯示在按鈕上的名稱則另外存入show_list
                         if file_size < 50000000:
                             video_list.append(video_file.split("-")[2])
+                            # 名稱字串每兩個數插入時間單位(先將字串轉成陣列, 然後使用list.insert插入字元, 最後再將陣列轉回字串)
+                            str_list = list(video_file.split("-")[2])
+                            str_list.insert(2, "點")
+                            str_list.insert(5, "分")
+                            str_list.insert(8, "秒")
+                            show_name = ''.join(str_list)
+                            show_list.append(show_name)
                 # 如果選擇清單不為空
                 if len(video_list) != 0:
                     respText = "請選擇影片存檔～"
                     # 傳送選擇清單給使用者
                     bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(video_name, callback_data = "archive_check:" +  request["device_number"] + ":" + request["archive_date"] + ":" + video_name + ":" + str(request["chat_id"]))] for video_name in video_list
+                        [InlineKeyboardButton(show_name, callback_data = "archive_check:" +  request["device_number"] + ":" + request["archive_date"] + ":" + video_name + ":" + str(request["chat_id"]))] for video_name, show_name in zip(video_list, show_list)
                     ]), parse_mode="Markdown")
                 # 如果選擇清單為空
                 else:
