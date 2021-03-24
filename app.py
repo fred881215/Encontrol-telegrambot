@@ -1174,15 +1174,28 @@ def archive_month(bot,update):
     # 如果傳過來的年份是當前年份
     if year == str(datetime.date.today()).split("-")[0]:
         # 取當前最大月份
-        max_month = int(str(datetime.date.today()).split("-")[1])
+        now_month = int(str(datetime.date.today()).split("-")[1])
+        # 將月份依序存入陣列
+        max_month = [month for month in range(1, now_month+1)]
+        # 如果月份數字不足四的倍數
+        if len(max_month) in [1, 5, 9]:
+            # 用空白字元補到四的倍數
+            for i in range(1, 3+1):
+                max_month.append(' ')
+        elif len(max_month) in [2, 6, 10]:
+            for i in range(1, 2+1):
+                max_month.append(' ')
+        elif len(max_month) in [3, 7, 11]:
+            max_month.append(' ')
+    # 如果傳過來的年份不是當前年份
     else:
         # 取最大月份(12)
-        max_month = 12
+        max_month = [month for month in range(1, 12+1)]
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(count_month) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month)),
-            InlineKeyboardButton(str(count_month+1) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+1)),
-            InlineKeyboardButton(str(count_month+2) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+2)),
-            InlineKeyboardButton(str(count_month+3) + "月", callback_data = "archive_day:" + device + ":" + year + ":" + str(count_month+3))] for count_month in range(1, max_month+1) if count_month in [1, 5, 9]
+        [InlineKeyboardButton(str(max_month[i]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i])),
+            InlineKeyboardButton(str(max_month[i+1]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+1])),
+            InlineKeyboardButton(str(max_month[i+2]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+2])),
+            InlineKeyboardButton(str(max_month[i+3]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+3]))] for i in range(0, len(max_month)) if i in [0, 4, 8]
     ]), parse_mode="Markdown")
     return
 
@@ -1196,33 +1209,32 @@ def archive_day(bot,update):
         # 在單月前面補0
         month = "0" + month
     respText = "請選擇影片存檔日期～"
-    # 如果月份數字大於當前年月日, 回傳錯誤訊息
-    if year == str(datetime.date.today()).split("-")[0] and int(month) > int(str(datetime.date.today()).split("-")[1]):
-        respText = "此月份超過可檢索範圍, 請確認後重新嘗試～"
+    # 如果月份為0+空白, 回傳錯誤訊息
+    if month == '0 ':
+        respText = "此按鈕不可選取, 請確認後重新嘗試～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         return
+    # 如果月份為大
+    if int(month) in [1,3,5,7,8,10,12]:
+        max_day = [day for day in range(1, 31+1)]
+        # 增加空值補齊日期按鈕
+        for i in range(1, 10):
+            max_day.append(' ')
+    # 如果月份為小
+    elif int(month) in [4,6,9,11]:
+        max_day = [day for day in range(1, 30+1)]
+        for i in range(1, 10):
+            max_day.append(' ')
+    # 如果月份為二
     else:
-        # 如果月份為大
-        if int(month) in [1,3,5,7,8,10,12]:
-            max_day = [day for day in range(1, 31+1)]
-            # 增加空值補齊日期按鈕
+        # 如果為閏年
+        if int(year)%4 == 0:
+            max_day = [day for day in range(1, 29+1)]
             for i in range(1, 10):
                 max_day.append(' ')
-        # 如果月份為小
-        elif int(month) in [4,6,9,11]:
-            max_day = [day for day in range(1, 30+1)]
-            for i in range(1, 10):
-                max_day.append(' ')
-        # 如果月份為二
+        # 如果非閏年
         else:
-            # 如果為閏年
-            if int(year)%4 == 0:
-                max_day = [day for day in range(1, 29+1)]
-                for i in range(1, 10):
-                    max_day.append(' ')
-            # 如果非閏年
-            else:
-                max_day = [day for day in range(1, 28+1)]
+            max_day = [day for day in range(1, 28+1)]
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton(str(max_day[i]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i])),
             InlineKeyboardButton(str(max_day[i+1]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+1])),
