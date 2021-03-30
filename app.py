@@ -1151,9 +1151,9 @@ def camera_request(bot, update):
     elif (mode == "archive"):
         respText = "請選擇影片存檔年份～"
         base_year = 2020
-        toyear = int(str(datetime.date.today()).split("-")[0])
+        max_year = int(str(datetime.date.today()).split("-")[0])
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(str(count_year) + "年", callback_data = "archive_month:" + device + ":" + str(count_year))] for count_year in range(base_year, toyear+1)
+            [InlineKeyboardButton(str(count_year), callback_data = "archive_month:" + device + ":" + str(count_year))] for count_year in range(base_year, max_year+1)
         ]), parse_mode="Markdown")
     return
 
@@ -1170,33 +1170,11 @@ def video_second(bot, update):
 def archive_month(bot,update):
     device = update.callback_query.data.split(':')[1]
     year = update.callback_query.data.split(':')[2]
-    respText = "請選擇影片存檔月份～"
-    # 如果傳過來的年份是當前年份
-    if year == str(datetime.date.today()).split("-")[0]:
-        # 取當前最大月份
-        now_month = int(str(datetime.date.today()).split("-")[1])
-        # 將月份依序存入陣列
-        max_month = [month for month in range(1, now_month+1)]
-        # 如果月份數字不足四的倍數
-        if len(max_month) in [1, 5, 9]:
-            # 用空白字元補到四的倍數
-            for i in range(1, 3+1):
-                max_month.append(' ')
-        elif len(max_month) in [2, 6, 10]:
-            for i in range(1, 2+1):
-                max_month.append(' ')
-        elif len(max_month) in [3, 7, 11]:
-            max_month.append(' ')
-    # 如果傳過來的年份不是當前年份
-    else:
-        # 取最大月份(12)
-        max_month = [month for month in range(1, 12+1)]
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(max_month[i]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i])),
-            InlineKeyboardButton(str(max_month[i+1]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+1])),
-            InlineKeyboardButton(str(max_month[i+2]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+2])),
-            InlineKeyboardButton(str(max_month[i+3]), callback_data = "archive_day:" + device + ":" + year + ":" + str(max_month[i+3]))] for i in range(0, len(max_month)) if i in [0, 4, 8]
-    ]), parse_mode="Markdown")
+    # 上傳使用者調取影片存檔請求
+    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_month", "archive_date":year, "device_number":device}}, upsert=True)
+    # 回傳當前選取狀態文字提示
+    respText = f"已選擇:{year}年"
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
 # 調取存檔(日期) 按鈕鍵盤 callback
@@ -1208,71 +1186,18 @@ def archive_day(bot,update):
     if len(month) == 1:
         # 在單月前面補0
         month = "0" + month
-    respText = "請選擇影片存檔日期～"
-    # 如果月份為0+空白, 回傳錯誤訊息
+    # 如果月份為0+空白(超出當前最大月份), 回傳錯誤訊息
     if month == '0 ':
         respText = "此按鈕不可選取, 請確認後重新嘗試～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         return
-    # 如果月份為大
-    if int(month) in [1,3,5,7,8,10,12]:
-        max_day = [day for day in range(1, 31+1)]
-        # 增加空值補齊日期按鈕
-        for i in range(1, 10):
-            max_day.append(' ')
-    # 如果月份為小
-    elif int(month) in [4,6,9,11]:
-        max_day = [day for day in range(1, 30+1)]
-        for i in range(1, 10):
-            max_day.append(' ')
-    # 如果月份為二
-    else:
-        # 如果為閏年
-        if int(year)%4 == 0:
-            max_day = [day for day in range(1, 29+1)]
-            for i in range(1, 10):
-                max_day.append(' ')
-        # 如果非閏年
-        else:
-            max_day = [day for day in range(1, 28+1)]
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(max_day[i]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i])),
-            InlineKeyboardButton(str(max_day[i+1]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+1])),
-            InlineKeyboardButton(str(max_day[i+2]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+2])),
-            InlineKeyboardButton(str(max_day[i+3]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+3])),
-            InlineKeyboardButton(str(max_day[i+4]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+4])),
-            InlineKeyboardButton(str(max_day[i+5]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+5])),
-            InlineKeyboardButton(str(max_day[i+6]), callback_data = "archive_apm:" + device + ":" + year + ":" + month + ":" + str(max_day[i+6]))] for i in range(0, len(max_day)) if i in [0, 7, 14, 21, 28]
-    ]), parse_mode="Markdown")
-    return
-
-# 調取存檔(時間範圍) 按鈕鍵盤 callback
-def archive_apm(bot,update):
-    device = update.callback_query.data.split(':')[1]
-    year = update.callback_query.data.split(':')[2]
-    month = update.callback_query.data.split(':')[3]
-    day = update.callback_query.data.split(':')[4]
-    # 如果日期數字小於十位數且未補0(date.today的日期格式為2020-01-01, 不是2020-1-1)
-    if len(day) == 1:
-        # 在單日前面補0
-        day = "0" + day
-    # 如果日期數字大於當前年月日, 回傳錯誤訊息
-    if year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1] and int(day) > int(str(datetime.date.today()).split("-")[2]):
-        respText = "此日期超過可檢索範圍, 請確認後重新嘗試～"
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
-        return
-    # 如果日期為0+空白, 回傳錯誤訊息
-    elif day == '0 ':
-        respText = "此按鈕不可選取, 請確認後重新嘗試～"
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
-        return
-    respText = "請選擇影片存檔時段～"
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton('[00:00~05:59]AM', callback_data = "archive_hour:" + device + ":" + year + ":" + month + ":" + day + ":" + "AM" + ":" + "1"),
-            InlineKeyboardButton('[06:00~11:59]AM', callback_data = "archive_hour:" + device + ":" + year + ":" + month + ":" + day + ":" + "AM" + ":" + "2")],
-        [InlineKeyboardButton('[12:00~17:59]PM', callback_data = "archive_hour:" + device + ":" + year + ":" + month + ":" + day + ":" + "PM" + ":" + "3"),
-            InlineKeyboardButton('[18:00~23:59]PM', callback_data = "archive_hour:" + device + ":" + year + ":" + month + ":" + day + ":" + "PM" + ":" + "4")]
-    ]), parse_mode="Markdown")
+    # 年份與月份結合成一個字串
+    archive_date = year + month
+    # 上傳使用者調取影片存檔請求
+    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_day", "archive_date":archive_date, "device_number":device}}, upsert=True)
+    # 回傳當前選取狀態文字提示
+    respText = f"已選擇:{year}年{month}月"
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
 # 調取存檔(小時) 按鈕鍵盤 callback
@@ -1281,33 +1206,32 @@ def archive_hour(bot,update):
     year = update.callback_query.data.split(':')[2]
     month = update.callback_query.data.split(':')[3]
     day = update.callback_query.data.split(':')[4]
-    APM = update.callback_query.data.split(':')[5]
-    apm = update.callback_query.data.split(':')[6]
-    # 依照回傳的時間範圍設定時間最小值及最大值
-    if apm == "1":
-        min_hour = 0
-        max_hour = 5
-    elif apm == "2":
-        min_hour = 6
-        max_hour = 11
-    elif apm == "3":
-        min_hour = 12
-        max_hour = 17
-    elif apm == "4":
-        min_hour = 18
-        max_hour = 23
-    if apm in ["1", "2"]:
-        apm = "AM"
-    else:
-        apm = "PM"
-    respText = "請選擇影片存檔時間～"
+    # 如果日期數字小於十位數且未補0(date.today的日期格式為2020-01-01, 不是2020-1-1)
+    if len(day) == 1:
+        # 在單日前面補0
+        day = "0" + day
+    # 如果日期為0+空白, 回傳錯誤訊息
+    if day == '0 ':
+        respText = "此按鈕不可選取, 請確認後重新嘗試～"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        return
+    # 如果日期數字大於當前年月日, 回傳錯誤訊息
+    elif year == str(datetime.date.today()).split("-")[0] and month == str(datetime.date.today()).split("-")[1] and int(day) > int(str(datetime.date.today()).split("-")[2]):
+        respText = "此日期超過可檢索範圍, 請確認後重新嘗試～"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        return
+    # 設定時間列表
+    max_hour = [hour for hour in range(0, 23+1)]
+    # 回傳當前選取狀態文字提示
+    respText = f"已選擇:{year}年{month}月{day}日"
+    respText += "\n請選擇影片存檔時間～"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(hour) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour)),
-            InlineKeyboardButton(str(hour+1) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour+1)),
-            InlineKeyboardButton(str(hour+2) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour+2)),
-            InlineKeyboardButton(str(hour+3) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour+3)),
-            InlineKeyboardButton(str(hour+4) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour+4)),
-            InlineKeyboardButton(str(hour+5) + "點", callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + APM + ":" + str(hour+5))] for hour in range(min_hour, max_hour+1) if hour in [0,6,12,18]
+        [InlineKeyboardButton(str(max_hour[i]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i])),
+            InlineKeyboardButton(str(max_hour[i+1]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+1])),
+            InlineKeyboardButton(str(max_hour[i+2]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+2])),
+            InlineKeyboardButton(str(max_hour[i+3]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+3])),
+            InlineKeyboardButton(str(max_hour[i+4]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+4])),
+            InlineKeyboardButton(str(max_hour[i+5]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+5]))] for i in range(0, len(max_hour)) if i in [0,6,12,18]
     ]), parse_mode="Markdown")
     return
 
@@ -1317,17 +1241,26 @@ def archive_all(bot, update):
     year = update.callback_query.data.split(':')[2]
     month = update.callback_query.data.split(':')[3]
     day = update.callback_query.data.split(':')[4]
-    APM = update.callback_query.data.split(':')[5]
-    hour = update.callback_query.data.split(':')[6]
+    hour = update.callback_query.data.split(':')[5]
     # 如果時間數字小於十位數且未補0
     if len(hour) == 1:
         # 在單月前面補0
         hour = "0" + hour
+    # 如果時間數字小於12
+    if int(hour) < 12:
+        # 時間範圍為上午(AM)
+        apm = "AM"
+    # 如果時間數字大於等於12
+    else:
+        # 時間範圍為下午(PM)
+        apm = "PM"
     # 時間字串組合
-    archive_date = year  + month  + day + APM + ":" + hour
+    archive_date = year  + month  + day + apm + ":" + hour
     # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"1", "archive_date":archive_date, "device_number":device, "video_name":""}}, upsert=True)
-    respText = "請等待存檔搜尋，不要重複操作～"
+    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"select_file", "archive_date":archive_date, "device_number":device, "video_name":""}}, upsert=True)
+    # 回傳當前選取狀態文字提示
+    respText = f"已選擇:{year}年{month}月{day}日{hour}點"
+    respText += "\n請等待存檔搜尋，不要重複操作～"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
@@ -1339,7 +1272,7 @@ def archive_check(bot, update):
     chat_id = update.callback_query.data.split(':')[5]
     print(chat_id)
     # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":int(chat_id)}, {"$set":{"status":"2", "device_number":device, "archive_date":archive_date, "video_name":video_name}}, upsert=True)
+    dbArchiveRequest.update_one({"chat_id":int(chat_id)}, {"$set":{"status":"return_result", "device_number":device, "archive_date":archive_date, "video_name":video_name}}, upsert=True)
     respText = "請等待存檔調取，不要重複操作～"
     bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
     return
@@ -1367,7 +1300,6 @@ updater.dispatcher.add_handler(CallbackQueryHandler(camera_request, pattern=r'ca
 updater.dispatcher.add_handler(CallbackQueryHandler(video_second, pattern=r'video_second'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_month, pattern=r'archive_month'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_day, pattern=r'archive_day'))
-updater.dispatcher.add_handler(CallbackQueryHandler(archive_apm, pattern=r'archive_apm'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_hour, pattern=r'archive_hour'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_all, pattern=r'archive_all'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_check, pattern=r'archive_check'))
