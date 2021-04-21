@@ -1,3 +1,7 @@
+telegram機器人: app.py
+本地伺服器: location.py
+api伺服器: capture_api.py
+
 Heroku 帳號@gmail, 密碼加點:a056966155.
 
 pip install python-telegram-bot
