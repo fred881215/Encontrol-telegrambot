@@ -69,17 +69,22 @@ dbCameraPower = myMongoDb['cameraPower']
 dbCameraControl = myMongoDb['cameraControl']
 dbCameraCreate = myMongoDb['cameraCreate']
 dbArchiveRequest = myMongoDb['archiveRequest']
+dbEngineroomImage = myMongoDb['engineroomImage']
+dbElectricmeterImage = myMongoDb['electricmeterImage']
 Y_check = False
 cameraCreate = False
+cameraRevise = False
+electricmeterRevise = False
+reviseData = ""
 createList = []
 
 # 懶人遙控器鍵盤定義
-device_list = ['溫度', '濕度', 'CO2', '電流', 'DL303', 'ET7044', 'UPS', '冷氣', '環控設備' ,'遠端控制', '每日通報', '服務列表', '服務狀態', '機房輪值', '設定機房', '機房資訊']
+device_list = ['溫度', '濕度', 'CO2', '電流', 'DL303', 'ET7044', 'UPS', '冷氣', '環控設備' ,'遠端控制', '每日通報', '服務列表', '服務狀態', '機房輪值', '設定機房', '機房資訊', '即時拍照', '即時錄影', '調閱影片', '機房進出照']
 # 懶人遙控器 Emoji 定義
-emoji_list = ["\U0001F321", "\U0001F4A7", "\U00002601", "\U000026A1", '', '', "\U0001F50B", "\U00002744", "\U0001F39B" ,"\U0001F579", "\U0001F4C6", "\U0001F4CB", "\U0001F468" + "\U0000200D" + "\U0001F4BB", "\U0001F46C", "\U00002699", "\U0001F5A5"]
+emoji_list = ["\U0001F321", "\U0001F4A7", "\U00002601", "\U000026A1", '', '', "\U0001F50B", "\U00002744", "\U0001F39B" ,"\U0001F579", "\U0001F4C6", "\U0001F4CB", "\U0001F468" + "\U0000200D" + "\U0001F4BB", "\U0001F46C", "\U00002699", "\U0001F5A5", "\U0001F4F7", "\U0001F4FD", "\U0001F39E", "\U0001F3C3"]
 
 # 設定機房資訊定義
-setting_list = ['vCPU (Core)', 'RAM (GB)', 'Storage (TB)', 'General Switch', 'SDN Switch', 'x86-PC', 'Server Board', 'GPU Card', '離開設定狀態']
+setting_list = ['vCPU (Core)', 'RAM (GB)', 'Storage (TB)', 'General Switch', 'SDN Switch', 'x86-PC', 'Server Board', 'GPU Card', '攝像機設定', '電錶資料設定', '離開設定狀態']
 setting_json_list = ['cpu', 'ram', 'storage', 'switch', 'sdn', 'pc', 'server','gpu']
 setting_unit_list = ['Core', 'GB', 'TB', '台', '台', '台', '台', '片']
 
@@ -265,7 +270,9 @@ def getDailyReport():
             data += "`電錶功耗統計: {0:>6.2f} 度`\n".format(float(cameraPower['today']['power'])-float(cameraPower['yesterday']['power']))
             data += "`電錶統計區間: `\n"
             data += "`" + str(datetime.datetime.strptime(str(dbCameraPower.find_one()['yesterday']['date']), '%Y-%m-%d %H:%M:%S.%f') + datetime.timedelta(hours=8)).split(" ")[0] + " ~ " + str(datetime.datetime.strptime(str(dbCameraPower.find_one()['today']['date']), '%Y-%m-%d %H:%M:%S.%f') + datetime.timedelta(hours=8)).split(" ")[0] + "`\n"
-            
+            # 攝影功能
+            data += "`當日電錶圖片: `\n"
+            data += "`" + dbElectricmeterImage.find_one({"feature":"today"})['url'] + "`\n"
             if (len(dailyReport["error"]) > 0): tagOwner = 1
         else:
             broken = 1
@@ -601,6 +608,9 @@ def reply_handler(bot, update):
     settingMode = dbDeviceCount.find_one()['setting']
     # 攝影功能
     global cameraCreate
+    global cameraRevise
+    global electricmeterRevise
+    global reviseData
 
     print("settingMode = ", settingMode)
     print("data = " + text)
@@ -609,7 +619,36 @@ def reply_handler(bot, update):
 
     if (settingMode == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
         settingObject = dbDeviceCount.find_one()['settingObject']
-        if (text in setting_list[:-1]):
+        # 攝影功能
+        if text == "攝像機設定":
+            # 關閉設定機房模式
+            dbDeviceCount.update_one({}, {'$set': {'setting': False}})
+            # 刪除機房鍵盤
+            respText = '進入攝像機設定模式'
+            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = ReplyKeyboardRemove(remove_keyboard=True), parse_mode="Markdown")
+            # 回傳設定按鈕
+            respText = '請選擇要進行的操作設定～'
+            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton('新增攝像機', callback_data = "camera_setting:" + "create"),
+                    InlineKeyboardButton('修改攝像機', callback_data = "camera_setting:" + "revise"),
+                    InlineKeyboardButton('刪除攝像機', callback_data = "camera_setting:" + "delete")]
+            ]), parse_mode="Markdown")
+            return
+        elif text == "電錶資料設定":
+            # 關閉設定機房模式
+            dbDeviceCount.update_one({}, {'$set': {'setting': False}})
+            # 刪除機房鍵盤
+            respText = '進入電錶資料設定模式'
+            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = ReplyKeyboardRemove(remove_keyboard=True), parse_mode="Markdown")
+            # 回傳設定按鈕
+            respText = '請選擇要進行的操作設定～'
+            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton('顯示電錶資料', callback_data = "electricmeter_setting:" + "display"),
+                    InlineKeyboardButton('修改當日資料', callback_data = "electricmeter_setting:" + "revise_today"),
+                    InlineKeyboardButton('修改昨日資料', callback_data = "electricmeter_setting:" + "revise_yesterday")]
+            ]), parse_mode="Markdown")
+            return
+        elif (text in setting_list[:-1]):
             dbDeviceCount.update_one({}, {'$set': {'settingObject': text}})
             respText = "`請輸入" + text + "數量~`"
         elif (text in setting_list[-1]):
@@ -648,71 +687,165 @@ def reply_handler(bot, update):
     elif (cameraCreate == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
         global Y_check
         global createList
+        # 如果使用者同意進入新增攝像機模式
         if text == "Y" or text == "y":
             respText = "如果要離開新增模式, 請輸入:(N/n)或(exit)\n" + "請輸入攝像機名稱(不可超過8個中文字)～"
+            # 開啟同意確認
             Y_check = True
+        # 如果使用者想要離開新增攝像機模式
         elif text == "N" or text == "n" or text == "exit":
             respText = "已離開新增攝像機模式～"
+            # 關閉同意確認和新增攝像機模式
             Y_check = False
             cameraCreate = False
+            # 創建列表清空
             createList = []
-        elif len(createList) < 5 and Y_check == True:
+        # 如果創建列表暫存的資料不超過8筆, 且經過同意確認
+        elif len(createList) < 8 and Y_check == True:
             respText = ""
+            # 如果創建列表為空或只有一筆資料, 且攝像機名稱, 位置不超過八個字元
             if ((len(createList) == 0 or len(createList) == 1) and len(text) <= 8):
+                # 依資料筆數回傳適當的提示文字
                 if len(createList) == 0:
                     respText += "可以使用這個名稱～\n" + "請輸入攝像機架設位置(不可超過8個中文字)～"
                 elif len(createList) == 1:
                     respText += "可以使用這個位置～\n" + "請輸入攝像機IP位址(IPv4)～"
+                # 字串加入創建列表
                 createList.append(text)
+            # 如果創建列表為空或只有一筆資料, 且攝像機名稱, 位置超過八個字元
             elif ((len(createList) == 0 or len(createList) == 1) and len(text) > 8):
+                # 回傳錯誤提示文字
                 respText += "字串長度超過上限, 請確認後重新輸入～"
+            # 如果創建列表有兩筆資料, 開始檢查IP位址格式
             elif len(createList) == 2:
+                # 如果母字串可以用三個小數點分隔成四個子字串(IPv4)
                 if len(text.split('.')) == 4:
-                    # 用try和int(str)判斷text除了分隔點和數字以外是否有參雜其他字元
+                    # 用try和int(str)判斷每個子字串除了分隔點和數字以外是否有參雜其他字元
                     try:
                         text_ip = text.split('.')
                         for i in range(len(text_ip)):
                             ip = int(text_ip[i])
+                    # 如果格式錯誤回傳錯誤提示訊息
                     except:
                         respText += "IP格式錯誤, 請確認後重新輸入～"
+                    # 如果驗證正確回傳提示文字
                     else:
                         respText += "位址格式正確～\n" + "請輸入攝像機Port號～"
                         createList.append(text)
+                # 如果母字串不可用三個小數點分隔成四個子字串(IPv4)
                 else:
                     respText += "位址長度不符規範, 請確認後重新輸入～"
+            # 如果創建列表有三筆資料, 開始檢查Port號格式
             elif len(createList) == 3:
+                # 如果字串不超過五個字元(埠號預設格式)
                 if len(text) <= 5:
+                    # 驗證字串是否由數字組成
                     try:
                         port = int(text)
+                    # 如果格式錯誤回傳錯誤提示訊息
                     except:
                         respText += "Port格式錯誤, 請確認後重新輸入～"
+                    # 如果驗證正確回傳提示文字
                     else:
-                        respText += "Port格式正確～\n" + "請輸入攝像機Pin code～"
+                        respText += "Port格式正確～\n" + "請輸入攝像機帳號(Account)～"
                         createList.append(text)
+                # 如果字串超過五個字元(埠號預設格式)
                 else:
                     respText += "Port號長度不符規範, 請確認後重新輸入～"
+            # 如果創建列表有四筆資料, 存入帳號字串
             elif len(createList) == 4:
-                try:
-                    pin = int(text)
-                except:
-                    respText += "Pin code格式錯誤, 請確認後重新輸入～"
+                respText += "請輸入攝像機密碼(Pin code)～"
+                createList.append(text)
+            # 如果創建列表有五筆資料, 存入密碼字串
+            elif len(createList) == 5:
+                respText += "請輸入攝像機URL(開頭不用加[/]斜線前綴)～"
+                createList.append(text)
+            # 如果創建列表有六筆資料, 開始檢查URL格式
+            elif len(createList) == 6:
+                # 如果字串不包含"/"斜線字元, 回傳錯誤提示訊息
+                if "/" not in text:
+                    respText += "URL格式錯誤, 請確認後重新輸入～"
+                # 如果字串包含"/"斜線字元, 回傳提示訊息
                 else:
-                    respText += "Pin code格式正確～\n"
+                    respText += "URL格式正確～\n" + "請輸入攝像機FPS(最大60)～"
                     createList.append(text)
+            # 如果創建列表有七筆資料, 開始檢查FPS格式
+            elif len(createList) == 7:
+                # 驗證字串是否由數字組成
+                try:
+                    port = int(text)
+                # 如果格式錯誤回傳錯誤提示訊息
+                except:
+                    respText += "FPS格式錯誤, 請確認後重新輸入～"
+                # 如果驗證正確回傳提示文字
+                else:
+                    # 如果數字小於等於60
+                    if int(text) <= 60:
+                        respText += "FPS格式正確～\n"
+                        createList.append(text)
+                    else:
+                        respText += "FPS數字過大, 請確認後重新輸入～"
             print(createList)
             # 和上面的多重if分開做判斷
-            if len(createList) == 5:
+            # 如果創建列表有七筆資料, 將資料存入對應欄位並傳送到資料庫
+            if len(createList) == 8:
                 respText += "資料已傳送, 請等待Server端進行資料驗證～"
                 # upsert新的資料表, 用來存使用者傳過去的攝像機資料, 本機端再抓出來驗證
-                dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "pin_code":createList[4], "chat_id":update.message.chat_id}}, upsert=True)
+                dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "account":createList[4], "pin_code":createList[5], "url":createList[6], "fps":createList[7], "chat_id":update.message.chat_id}}, upsert=True)
                 print("Request send")
+                # 關閉同意確認和新增攝像機模式
                 Y_check = False
                 cameraCreate = False
+                # 創建列表清空
                 createList = []
+        # 如果使用者輸入字串不是同意或拒絕
         else:
+            # 回傳錯誤提示文字
             respText = "無效的指令, 請回應(Y/N)～"
         bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
         return
+
+    # 修改 攝像機 功能
+    elif (cameraRevise == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
+        device = reviseData.split(":")[0]
+        mode = reviseData.split(":")[1]
+        # 獲取原始資料
+        origin_data = dbCameraControl.find_one({"device_number":device})
+        # 更新使用者設定的欄位資料
+        dbCameraControl.update_one({"device_number":device}, {"$set":{mode:text}}, upsert=True)
+        # 關閉修改攝像機模式
+        cameraRevise = False
+        # 修改資料清空
+        reviseData = ""
+        # 回傳提示文字
+        respText = "資料修改完成\n"
+        respText += f"欄位資料已從'{origin_data[mode]}'修改為:'{text}'"
+        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+
+    # 修改 電錶資料 功能
+    elif (electricmeterRevise == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
+        mode = reviseData.split(":")[0]
+        field = reviseData.split(":")[1]
+        # 如果請求為修改當日電錶資料
+        if mode == "revise_today":
+            # 獲取原始當日資料
+            origin_data = dbElectricmeterImage.find_one({"feature":"today"})
+            # 更新使用者設定的欄位資料
+            dbElectricmeterImage.update_one({"feature":"today"}, {"$set":{field:text}}, upsert=True)
+        # 如果請求為修改昨日電錶資料
+        elif mode == "revise_yesterday":
+            # 獲取原始昨日資料
+            origin_data = dbElectricmeterImage.find_one({"feature":"yesterday"})
+            # 更新使用者設定的欄位資料
+            dbElectricmeterImage.update_one({"feature":"yesterday"}, {"$set":{field:text}}, upsert=True)
+        # 關閉修改攝像機模式
+        cameraRevise = False
+        # 修改資料清空
+        reviseData = ""
+        # 回傳提示文字
+        respText = "資料修改完成\n"
+        respText += f"欄位資料已從'{origin_data[field]}'修改為:'{text}'"
+        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
 
     # 開啟 懶人遙控器鍵盤
     elif (text == '輔助鍵盤'):
@@ -727,7 +860,8 @@ def reply_handler(bot, update):
             [str(s + e) for s, e in zip(emoji_list[0:4], device_list[0:4])],
             [str(s + e) for s, e in zip(emoji_list[4:8], device_list[4:8])],
             [str(s + "\n" + e) for s, e in zip(emoji_list[8:12], device_list[8:12])],
-            [str(s + "\n" + e) for s, e in zip(emoji_list[12:16], device_list[12:16])]
+            [str(s + "\n" + e) for s, e in zip(emoji_list[12:16], device_list[12:16])],
+            [str(s + "\n" + e) for s, e in zip(emoji_list[16:20], device_list[16:20])]
         ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
         return
 
@@ -882,7 +1016,8 @@ def reply_handler(bot, update):
             bot.sendPhoto(chat_id=update.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
                 [str(s) for s in setting_list[0:3]],
                 [str(s) for s in setting_list[3:6]],
-                [str(s) for s in setting_list[6:9]]
+                [str(s) for s in setting_list[6:9]],
+                [str(s) for s in setting_list[9:11]]
             ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
             return
     
@@ -908,13 +1043,39 @@ def reply_handler(bot, update):
 
     # 攝影功能
     # 實驗室 拍照錄影 功能
-    elif (text == '拍照錄影'):
-        respText = '拍照錄影功能面板～'
+    elif (text in ["即時拍照", "即時錄影", "調閱影片", "\U0001F4F7\n即時拍照", "\U0001F4FD\n即時錄影", "\U0001F39E\n調閱影片"]):
+        respText = '請選擇編號攝像機～'
+        # 如果功能文字為下列其中一項, mode設定為對應的英文關鍵字
+        if text in ["即時拍照", "\U0001F4F7\n即時拍照"]:
+            mode = "photo"
+        elif text in ["即時錄影", "\U0001F4FD\n即時錄影"]:
+            mode = "video"
+        elif text in ["調閱影片", "\U0001F39E\n調閱影片"]:
+            mode = "archive"
+        # 宣告攝像機號碼清單
+        device_number_list = []
+        # 宣告攝像機名稱清單
+        device_name_list = []
+        all_camera = dbCameraControl.find()
+        # 迴圈搜尋已經建立資料的攝像機並加入列表
+        for camera in all_camera:
+            device_number_list.append(camera["device_number"])
+            device_name_list.append(camera["device_name"])
+        # 傳送攝像機選擇按鈕
         bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton('即時拍照', callback_data = "camera_mode:" + "photo"),
-                InlineKeyboardButton('定點錄影', callback_data = "camera_mode:" + "video")],
-            [InlineKeyboardButton('調取存檔', callback_data = "camera_mode:" + "archive"),
-                InlineKeyboardButton('新攝像機', callback_data = "camera_mode:" + "create")]
+            [InlineKeyboardButton('攝影機' + device_number + ':' + device_name, callback_data = "camera_select:" + device_number + ":" + mode)] for device_number, device_name in zip(device_number_list, device_name_list)
+        ]), parse_mode="Markdown")
+        return
+
+    elif (text in ["機房進出照", "\U0001F3C3\n機房進出照"]):
+        respText = "請選擇照片存檔年份～"
+        # 設定基底年份
+        base_year = 2020
+        # 獲取當前年份
+        max_year = int(str(datetime.date.today()).split("-")[0])
+        # 迴圈拋出年份按鈕
+        bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton(str(count_year), callback_data = "archive_month:" + "engineroom" + ":" + str(count_year))] for count_year in range(base_year, max_year+1)
         ]), parse_mode="Markdown")
         return
 
@@ -1109,49 +1270,144 @@ def device_setting(bot, update):
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
-# 拍照錄影 按鈕鍵盤 callback
-def camera_select(bot, update):
+# 攝像機設定 按鈕鍵盤 callback
+def camera_setting(bot, update):
     mode = update.callback_query.data.split(':')[1]
-    if mode == 'photo' or mode == 'video' or mode == 'archive':
-        respText = '請選擇編號攝像機～'
-        # 攝影機名稱清單
-        device_number_list = []
-        device_name_list = []
-        all_camera = dbCameraControl.find()
-        for camera in all_camera:
-            device_number_list.append(camera["device_number"])
-            device_name_list.append(camera["device_name"])
-        count_list = len([i for i in dbCameraControl.find()])
-        # 即時更新選擇按鈕
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton('攝影機' + device_number + ':' + device_name, callback_data = "camera_select:" + device_number + ":" + mode)] for device_number, device_name in zip(device_number_list, device_name_list)
-        ]), parse_mode="Markdown")
-    elif mode == 'create':
+    # 如果設定模式為新增攝像機
+    if mode == "create":
         respText = '是否開始新增攝像機？(Y/N)'
+        # 開啟新增攝像機模式
         global cameraCreate
         cameraCreate = True
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    # 如果設定模式為修改, 刪除攝像機
+    elif mode == "revise" or mode == "delete":
+        # 宣告攝像機號碼清單
+        device_number_list = []
+        # 宣告攝像機名稱清單
+        device_name_list = []
+        all_camera = dbCameraControl.find()
+        # 迴圈搜尋已經建立資料的攝像機並將號碼和名稱加入列表
+        for camera in all_camera:
+            device_number_list.append(camera["device_number"])
+            device_name_list.append(camera["device_name"])
+        # 判斷目前設定模式要回傳的提示訊息
+        if mode == "revise":
+            respText = "請選擇要修改的攝像機資料～"
+        elif mode == "delete":
+            respText = "請選擇要刪除的攝像機資料～"
+        # 傳送攝像機選擇按鈕
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton('攝影機' + device_number + ':' + device_name, callback_data = "camera_process:" + device_number + ":" + mode)] for device_number, device_name in zip(device_number_list, device_name_list)
+        ]), parse_mode="Markdown")
     return
 
-# 相機選擇 按鈕鍵盤 callback
-def camera_request(bot, update):
+# 攝像機處理 按鈕鍵盤 callback
+def camera_process(bot, update):
     device = update.callback_query.data.split(':')[1]
     mode = update.callback_query.data.split(':')[2]
-    if (mode == "photo"):
-        respText = "請等待攝影完成，不要重複操作～"
-        dbCameraControl.update_one({"device_number":device}, {"$set":{"status":"1", "video_second":"0", "chat_id":update.callback_query.message.chat_id}}, upsert=True)
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
-    elif (mode == "video"):
-        respText = "請選擇錄影秒數～"
+    # 如果設定模式為修改攝像機
+    if mode == "revise":
+        respText = "請選擇要修改的欄位～"
+        # 回傳修改欄位選取按鈕
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton('15', callback_data = "video_second:" + "15" + ":" + device)],
-            [InlineKeyboardButton('30', callback_data = "video_second:" + "30" + ":" + device)],
-            [InlineKeyboardButton('60', callback_data = "video_second:" + "60" + ":" + device)]
+            [InlineKeyboardButton('名稱(name)', callback_data = "revise_process:" + device + ":" + "device_name"),
+                InlineKeyboardButton('位置(location)', callback_data = "revise_process:" + device + ":" + "device_location"),
+                InlineKeyboardButton('網路位址(IP)', callback_data = "revise_process:" + device + ":" + "device_ip")],
+            [InlineKeyboardButton('連接埠號(Port)', callback_data = "revise_process:" + device + ":" + "device_port"),
+                InlineKeyboardButton('帳號(Account)', callback_data = "revise_process:" + device + ":" + "account"),
+                InlineKeyboardButton('密碼(Pincode)', callback_data = "revise_process:" + device + ":" + "pin_code")],
+            [InlineKeyboardButton('執行位址(Url)', callback_data = "revise_process:" + device + ":" + "url"),
+                InlineKeyboardButton('擷取速率(FPS)', callback_data = "revise_process:" + device + ":" + "fps")]
         ]), parse_mode="Markdown")
-    elif (mode == "archive"):
+    # 如果設定模式為刪除攝像機
+    elif mode == "delete":
+        respText = "該攝像機資料已經刪除～"
+        # 依"device_number"欄位將資料庫中符合的該筆資料刪除
+        camera = dbCameraControl.delete_one({"device_number":device})
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    return
+
+# 攝像機修改 按鈕鍵盤 callback
+def revise_process(bot, update):
+    device = update.callback_query.data.split(':')[1]
+    mode = update.callback_query.data.split(':')[2]
+    respText = f"當前選擇的欄位為:[{mode}]\n"
+    respText += "請輸入要修改的資料～"
+    # 開啟修改攝像機模式
+    global cameraRevise
+    global reviseData
+    cameraRevise = True
+    reviseData = device + ":" + mode
+    # 回傳提示文字後等待使用者輸入
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+
+# 電錶資料設定 按鈕鍵盤 callback
+def electricmeter_setting(bot, update):
+    mode = update.callback_query.data.split(':')[1]
+    if mode == "display":
+        # 獲取電錶資料
+        today_data = dbElectricmeterImage.find_one({"feature":"today"})
+        yesterday_data = dbElectricmeterImage.find_one({"feature":"yesterday"})
+        # 回傳電錶資料
+        respText = f"當日電錶度數:[{today_data['kWh']}]\n"
+        respText += f"當日紀錄時間:[{today_data['archive_date']}]\n"
+        respText += today_data["url"]
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        respText = f"昨日電錶度數:[{yesterday_data['kWh']}]\n"
+        respText += f"昨日紀錄時間:[{yesterday_data['archive_date']}]\n"
+        respText += yesterday_data["url"]
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    elif mode == "revise_today" or mode == "revise_yesterday":
+        respText = "請選擇要修改的欄位～"
+        # 回傳資料欄位按鈕
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton('電錶度數', callback_data = "electricmeter_process:" + mode + ":" + "kWh"),
+                InlineKeyboardButton('紀錄時間', callback_data = "electricmeter_process:" + mode + ":" + "archive_date")]
+        ]), parse_mode="Markdown")
+
+# 電錶資料處理 按鈕鍵盤 callback
+def electricmeter_process(bot, update):
+    mode = update.callback_query.data.split(':')[1]
+    field = update.callback_query.data.split(':')[2]
+    respText = f"當前選擇的欄位為:[{field}]\n"
+    respText += "請輸入要修改的資料～"
+    # 開啟電錶資料修改模式
+    global electricmeterRevise
+    global reviseData
+    electricmeterRevise = True
+    reviseData = mode + ":" + field
+    # 回傳提示文字後等待使用者輸入
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+
+# 影像模式 按鈕鍵盤 callback
+def camera_select(bot, update):
+    device = update.callback_query.data.split(':')[1]
+    mode = update.callback_query.data.split(':')[2]
+    # 如果影像模式為拍照
+    if mode == "photo":
+        respText = "請等待攝影完成，不要重複操作～"
+        # 資料庫存入即時拍照狀態值, 等候主機端進行處理
+        dbCameraControl.update_one({"device_number":device}, {"$set":{"status":"intime_photo", "video_second":"0", "chat_id":update.callback_query.message.chat_id}}, upsert=True)
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    # 如果影像模式為錄影
+    elif mode == "video":
+        respText = "請選擇錄影秒數～"
+        # 回傳錄影秒數按鈕
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton('15', callback_data = "video_second:" + "15" + ":" + device),
+                InlineKeyboardButton('30', callback_data = "video_second:" + "30" + ":" + device),
+                InlineKeyboardButton('45', callback_data = "video_second:" + "45" + ":" + device),
+                InlineKeyboardButton('60', callback_data = "video_second:" + "60" + ":" + device)]
+        ]), parse_mode="Markdown")
+    # 如果影像模式為調取存檔
+    elif mode == "archive":
         respText = "請選擇影片存檔年份～"
+        # 設定基底年份
         base_year = 2020
+        # 獲取當前年份
         max_year = int(str(datetime.date.today()).split("-")[0])
+        # 迴圈拋出年份按鈕
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(str(count_year), callback_data = "archive_month:" + device + ":" + str(count_year))] for count_year in range(base_year, max_year+1)
         ]), parse_mode="Markdown")
@@ -1161,7 +1417,8 @@ def camera_request(bot, update):
 def video_second(bot, update):
     second = update.callback_query.data.split(':')[1]
     device = update.callback_query.data.split(':')[2]
-    dbCameraControl.update_one({"device_number":device}, {"$set":{"status":"2", "video_second":second, "chat_id":update.callback_query.message.chat_id}}, upsert=True)
+    # 資料庫存入即時錄影狀態值與錄影秒數, 等候主機端進行處理
+    dbCameraControl.update_one({"device_number":device}, {"$set":{"status":"intime_video", "video_second":second, "chat_id":update.callback_query.message.chat_id}}, upsert=True)
     respText = "請等待錄影完成，不要重複操作～"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
@@ -1170,8 +1427,14 @@ def video_second(bot, update):
 def archive_month(bot,update):
     device = update.callback_query.data.split(':')[1]
     year = update.callback_query.data.split(':')[2]
-    # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_month", "archive_date":year, "device_number":device}}, upsert=True)
+    # 如果使用者從機房進出照的按鈕callback跳轉過來
+    if device == "engineroom":
+        # 上傳使用者調取照片存檔請求
+        dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_month", "archive_date":year}}, upsert=True)
+    # 如果使用者從影像模式-調取存檔的按鈕callback跳轉過來
+    else:
+        # 上傳使用者調取影片存檔請求
+        dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_month", "archive_date":year, "device_number":device}}, upsert=True)
     # 回傳當前選取狀態文字提示
     respText = f"已選擇:{year}年"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
@@ -1193,8 +1456,14 @@ def archive_day(bot,update):
         return
     # 年份與月份結合成一個字串
     archive_date = year + month
-    # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_day", "archive_date":archive_date, "device_number":device}}, upsert=True)
+    # 如果 device 欄位內容為機房照片
+    if device == "engineroom":
+        # 上傳使用者調取照片存檔請求
+        dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_day", "archive_date":archive_date}}, upsert=True)
+    # 如果 device 欄位內容為影片存檔
+    else:
+        # 上傳使用者調取影片存檔請求
+        dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_day", "archive_date":archive_date, "device_number":device}}, upsert=True)
     # 回傳當前選取狀態文字提示
     respText = f"已選擇:{year}年{month}月"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
@@ -1220,19 +1489,19 @@ def archive_hour(bot,update):
         respText = "此日期超過可檢索範圍, 請確認後重新嘗試～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         return
-    # 設定時間列表
-    max_hour = [hour for hour in range(0, 23+1)]
+    # 年份與月份結合成一個字串
+    archive_date = year + month + day
+    # 如果 device 欄位內容為機房照片
+    if device == "engineroom":
+        # 上傳使用者調取照片存檔請求
+        dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_hour", "archive_date":archive_date}}, upsert=True)
+    # 如果 device 欄位內容為影片存檔
+    else:
+        # 上傳使用者調取影片存檔請求
+        dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_hour", "archive_date":archive_date, "device_number":device}}, upsert=True)
     # 回傳當前選取狀態文字提示
     respText = f"已選擇:{year}年{month}月{day}日"
-    respText += "\n請選擇影片存檔時間～"
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(max_hour[i]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i])),
-            InlineKeyboardButton(str(max_hour[i+1]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+1])),
-            InlineKeyboardButton(str(max_hour[i+2]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+2])),
-            InlineKeyboardButton(str(max_hour[i+3]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+3])),
-            InlineKeyboardButton(str(max_hour[i+4]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+4])),
-            InlineKeyboardButton(str(max_hour[i+5]), callback_data = "archive_all:" + device + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+5]))] for i in range(0, len(max_hour)) if i in [0,6,12,18]
-    ]), parse_mode="Markdown")
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
 # 調取存檔(整合傳送) 按鈕鍵盤 callback
@@ -1246,18 +1515,26 @@ def archive_all(bot, update):
     if len(hour) == 1:
         # 在單月前面補0
         hour = "0" + hour
-    # 如果時間數字小於12
-    if int(hour) < 12:
-        # 時間範圍為上午(AM)
-        apm = "AM"
-    # 如果時間數字大於等於12
+    # 如果 device 欄位內容為機房照片
+    if device == "engineroom":
+        # 時間字串組合
+        archive_date = year  + month  + day + ":" + hour
+        # 上傳使用者調取照片存檔請求
+        dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"select_file", "archive_date":archive_date}}, upsert=True)
+    # 如果 device 欄位內容為影片存檔
     else:
-        # 時間範圍為下午(PM)
-        apm = "PM"
-    # 時間字串組合
-    archive_date = year  + month  + day + apm + ":" + hour
-    # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"select_file", "archive_date":archive_date, "device_number":device, "video_name":""}}, upsert=True)
+        # 如果時間數字小於12
+        if int(hour) < 12:
+            # 時間範圍為上午(AM)
+            apm = "AM"
+        # 如果時間數字大於等於12
+        else:
+            # 時間範圍為下午(PM)
+            apm = "PM"
+        # 時間字串組合
+        archive_date = year  + month  + day + apm + ":" + hour
+        # 上傳使用者調取影片存檔請求
+        dbArchiveRequest.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"select_file", "archive_date":archive_date, "device_number":device, "video_name":""}}, upsert=True)
     # 回傳當前選取狀態文字提示
     respText = f"已選擇:{year}年{month}月{day}日{hour}點"
     respText += "\n請等待存檔搜尋，不要重複操作～"
@@ -1266,13 +1543,31 @@ def archive_all(bot, update):
 
 # 調取存檔(選擇影片) 按鈕鍵盤 callback
 def archive_check(bot, update):
-    device = update.callback_query.data.split(':')[1]
-    archive_date = update.callback_query.data.split(':')[2] + ":" + update.callback_query.data.split(':')[3]
-    video_name = update.callback_query.data.split(':')[4]
-    chat_id = update.callback_query.data.split(':')[5]
-    print(chat_id)
-    # 上傳使用者調取影片存檔請求
-    dbArchiveRequest.update_one({"chat_id":int(chat_id)}, {"$set":{"status":"return_result", "device_number":device, "archive_date":archive_date, "video_name":video_name}}, upsert=True)
+    # 如果 callback 冒號分格的[1]資料內容為機房照片
+    if update.callback_query.data.split(':')[1] == "engineroom":
+        device = update.callback_query.data.split(':')[1]
+        archive_date = update.callback_query.data.split(':')[2]
+        file_name = update.callback_query.data.split(':')[3]
+        chat_id = update.callback_query.data.split(':')[4]
+    # 如果 device 欄位內容為影片存檔
+    else:
+        device = update.callback_query.data.split(':')[1]
+        archive_date = update.callback_query.data.split(':')[2] + ":" + update.callback_query.data.split(':')[3]
+        file_name = update.callback_query.data.split(':')[4]
+        chat_id = update.callback_query.data.split(':')[5]
+    # 如果檔名為空白字元, 回傳錯誤訊息
+    if file_name == " ":
+        respText = "此按鈕不可選取, 請確認後重新嘗試～"
+        bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
+        return
+    # 如果 device 欄位內容為機房照片
+    if device == "engineroom":
+        # 上傳使用者調取照片存檔請求
+        dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"return_result", "archive_date":archive_date, "image_name":file_name}}, upsert=True)
+    # 如果 device 欄位內容為影片存檔
+    else:
+        # 上傳使用者調取影片存檔請求
+        dbArchiveRequest.update_one({"chat_id":int(chat_id)}, {"$set":{"status":"return_result", "device_number":device, "archive_date":archive_date, "video_name":file_name}}, upsert=True)
     respText = "請等待存檔調取，不要重複操作～"
     bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
     return
@@ -1295,8 +1590,12 @@ updater.dispatcher.add_handler(CallbackQueryHandler(current_select, pattern=r'cu
 updater.dispatcher.add_handler(CallbackQueryHandler(daily_select, pattern=r'daily'))
 updater.dispatcher.add_handler(CallbackQueryHandler(device_setting, pattern=r'setting'))
 # 攝影功能
-updater.dispatcher.add_handler(CallbackQueryHandler(camera_select, pattern=r'camera_mode'))
-updater.dispatcher.add_handler(CallbackQueryHandler(camera_request, pattern=r'camera_select'))
+updater.dispatcher.add_handler(CallbackQueryHandler(camera_setting, pattern=r'camera_setting'))
+updater.dispatcher.add_handler(CallbackQueryHandler(camera_process, pattern=r'camera_process'))
+updater.dispatcher.add_handler(CallbackQueryHandler(revise_process, pattern=r'revise_process'))
+updater.dispatcher.add_handler(CallbackQueryHandler(electricmeter_setting, pattern=r'electricmeter_setting'))
+updater.dispatcher.add_handler(CallbackQueryHandler(electricmeter_process, pattern=r'electricmeter_process'))
+updater.dispatcher.add_handler(CallbackQueryHandler(camera_select, pattern=r'camera_select'))
 updater.dispatcher.add_handler(CallbackQueryHandler(video_second, pattern=r'video_second'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_month, pattern=r'archive_month'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_day, pattern=r'archive_day'))
