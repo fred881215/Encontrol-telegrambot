@@ -1,3 +1,4 @@
+# coding=utf-8
 import telegram
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
@@ -21,10 +22,9 @@ myMongoClient = MongoClient(config['MONGODB']['URL'])
 myMongoDb = myMongoClient["smart-data-center"]
 
 # 攝影功能
-dbCameraControl = myMongoDb['cameraControl']
 dbCameraCreate = myMongoDb['cameraCreate']
+dbCameraControl = myMongoDb['cameraControl']
 dbArchiveRequest = myMongoDb['archiveRequest']
-dbElectricmeterImage = myMongoDb['electricmeterImage']
 dbEngineroomImage = myMongoDb['engineroomImage']
 
 # imgur 圖床設置
@@ -79,7 +79,7 @@ def main():
                 result = socket_connection(request["device_ip"], int(request["device_port"]))
                 if result == 0:
                     # 將欄位資料組合成 rtsp 協定格式的 url, 供 opencv 導入攝像機
-                    url = f"rtsp://{request['account']}:{request['pin_code']}@{request['device_ip']}:{request['device_port']}/{request['url']}"
+                    url = f"rtsp://{request['account']}:{request['pin_code']}@{request['device_ip']}:{request['device_port']}{request['url']}"
                     # 拍照功能
                     if request["status"] == "intime_photo":
                         # 導入攝像機
@@ -264,6 +264,8 @@ def main():
                 if exist_check != True:
                     respText = "此月份沒有影片存檔～"
                     bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
+                    # 使用者請求清空
+                    dbArchiveRequest.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0"}}, upsert=True)
                     return
                 # 父迴圈, 從1開始遞增, 直到最大日期結束
                 for i in range(1, len(max_day)+1):
@@ -309,8 +311,14 @@ def main():
                 # 設定時間列表
                 max_hour = [hour for hour in range(0, 23+1)]
                 # 透過使用者請求的設備特定掛載的網路硬碟資料夾內容
-                am_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + request["archive_date"] + "AM")
-                pm_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + request["archive_date"] + "PM")
+                try:
+                    am_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + request["archive_date"] + "AM")
+                except:
+                    am_video_list = []
+                try:
+                    pm_video_list = os.listdir("//mnt/telegram/2706_" + request["device_number"] + "/" + request["archive_date"] + "PM")
+                except:
+                    pm_video_list = []
                 all_video_list = am_video_list + pm_video_list
                 # 宣告存放顏文字unicode的空列表
                 unicode_emoji_list = []
@@ -507,7 +515,7 @@ def main():
                             # 增加紅色打叉圖案後結束子迴圈, 繼續跑父迴圈
                             unicode_emoji_list.append("\U0000274C")
                 # 回傳當前選取狀態文字提示
-                respText = "請選擇圖片存檔月份～"
+                respText = "請選擇機房人員進出月份～"
                 bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton(unicode_emoji_list[i] + str(max_month[i]), callback_data = "archive_day:" + "engineroom" + ":" + request["archive_date"] + ":" + str(max_month[i])),
                         InlineKeyboardButton(unicode_emoji_list[i+1] + str(max_month[i+1]), callback_data = "archive_day:" + "engineroom" + ":" + request["archive_date"] + ":" + str(max_month[i+1])),
@@ -548,6 +556,21 @@ def main():
                 all_image_list = os.listdir("//mnt/telegram/Engineroom")
                 # 宣告存放顏文字unicode的空列表
                 unicode_emoji_list = []
+                # 宣告檢查資料夾是否存在的空布林值
+                exist_check = None
+                # 迴圈掃描主資料夾內的年月份資料夾
+                for image_file in all_image_list:
+                    # 如果使用者請求的年月份資料夾存在
+                    if request["archive_date"] in image_file:
+                        # 將結果保存
+                        exist_check = True
+                # 如果找不到該年月份資料夾, 回傳錯誤訊息
+                if exist_check != True:
+                    respText = "此月份沒有機房人員進出～"
+                    bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
+                    # 使用者請求清空
+                    dbEngineroomImage.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0"}}, upsert=True)
+                    return
                 # 父迴圈, 從1開始遞增, 直到最大日期結束
                 for i in range(1, len(max_day)+1):
                     # 如果日期字串長度等於1, 字元前面補0
@@ -568,7 +591,7 @@ def main():
                             # 增加紅色打叉圖案後結束子迴圈, 繼續跑父迴圈
                             unicode_emoji_list.append("\U0000274C")
                 # 回傳當前選取狀態文字提示
-                respText = "請選擇圖片存檔日期～"
+                respText = "請選擇機房人員進出日期～"
                 bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton(unicode_emoji_list[i] + str(max_day[i]), callback_data = "archive_hour:" + "engineroom" + ":" + year + ":" + month + ":" + str(max_day[i])),
                         InlineKeyboardButton(unicode_emoji_list[i+1] + str(max_day[i+1]), callback_data = "archive_hour:" + "engineroom" + ":" + year + ":" + month + ":" + str(max_day[i+1])),
@@ -595,7 +618,7 @@ def main():
                     # 透過使用者請求的設備特定掛載的網路硬碟資料夾內容
                     all_image_list = os.listdir("//mnt/telegram/Engineroom/" + request["archive_date"])
                 except:
-                    respText = "該時段沒有存檔～"
+                    respText = "此日期沒有機房人員進出"
                     # 傳送提示文字給使用者
                     bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
                 else:
@@ -621,7 +644,7 @@ def main():
                                 # 增加紅色打叉圖案後結束子迴圈, 繼續跑父迴圈
                                 unicode_emoji_list.append("\U0000274C")
                     # 回傳當前選取狀態文字提示
-                    respText = "請選擇圖片存檔時間～"
+                    respText = "請選擇機房人員進出時間～"
                     bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
                         [InlineKeyboardButton(unicode_emoji_list[i] + str(max_hour[i]), callback_data = "archive_all:" + "engineroom" + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i])),
                             InlineKeyboardButton(unicode_emoji_list[i+1] + str(max_hour[i+1]), callback_data = "archive_all:" + "engineroom" + ":" + year + ":" + month + ":" + day + ":" + str(max_hour[i+1])),
@@ -642,54 +665,54 @@ def main():
                     # 透過使用者請求的日期特定掛載的網路硬碟資料夾內容, 執行失敗代表資料夾不存在
                     all_image_list = os.listdir("//mnt/telegram/Engineroom/" + archive_date)
                 except:
-                    respText = "該時段沒有存檔～"
+                    respText = "此時段沒有機房人員進出"
                     # 傳送提示文字給使用者
                     bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
                 else:
                     # 設定暫存清單
                     image_list = []
+                    show_list = []
                     # 迴圈掃描所有資料夾內的影片檔
                     for image_file in all_image_list:
                         # 如果檔名符合使用者請求的時間
                         if archive_hour == image_file.split("-")[2][0:2]:
+                            # 名稱字串每兩個數插入時間單位(先將字串轉成陣列, 然後使用list.insert插入字元, 最後再用join將陣列轉回字串)
+                            str_list = list(image_file.split("-")[2])
+                            str_list.insert(2, ":")
+                            str_list.insert(5, ":")
+                            show_name = ''.join(str_list)
                             # 添加檔名進入選擇清單
                             image_list.append(image_file.split("-")[2])
+                            show_list.append(show_name)
                     # 如果選擇清單不為空
                     if len(image_list) != 0:
-                        respText = "請選擇影片存檔起始時間～"
+                        respText = "請選擇機房人員進出時間～"
                         # 避免出現錯誤, 使用try進行測試
                         try:
                             # 傳送選擇清單給使用者
                             bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
-                                [InlineKeyboardButton(image_list[i], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i] + ":" + str(request["chat_id"])),
-                                    InlineKeyboardButton(image_list[i+1], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i+1] + ":" + str(request["chat_id"]))] for i in range(0, len(image_list)) if i == 0 or (i % 2) == 0
+                                [InlineKeyboardButton(show_list[i], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i] + ":" + str(request["chat_id"])),
+                                    InlineKeyboardButton(show_list[i+1], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i+1] + ":" + str(request["chat_id"]))] for i in range(0, len(image_list)) if i == 0 or (i % 2) == 0
                             ]), parse_mode="Markdown")
                         # 如果出現 [IndexError: list index out of range] (超出列表範圍)錯誤
                         except:
                             # 圖片列表末尾增加空值
                             image_list.append(' ')
+                            show_list.append(' ')
                             # 傳送選擇清單給使用者
                             bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
-                                [InlineKeyboardButton(image_list[i], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i] + ":" + str(request["chat_id"])),
-                                    InlineKeyboardButton(image_list[i+1], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i+1] + ":" + str(request["chat_id"]))] for i in range(0, len(image_list)) if i == 0 or (i % 2) == 0
+                                [InlineKeyboardButton(show_list[i], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i] + ":" + str(request["chat_id"])),
+                                    InlineKeyboardButton(show_list[i+1], callback_data = "archive_check:" +  "engineroom" + ":" + archive_date + ":" + image_list[i+1] + ":" + str(request["chat_id"]))] for i in range(0, len(image_list)) if i == 0 or (i % 2) == 0
                             ]), parse_mode="Markdown")
                     # 如果選擇清單為空
                     else:
-                        respText = "該時段沒有存檔～"
+                        respText = "此時段沒有機房人員進出"
                         # 傳送提示文字給使用者
                         bot.send_message(chat_id=request["chat_id"], text=respText, parse_mode="Markdown")
                 # 使用者請求清空
                 dbEngineroomImage.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0"}}, upsert=True)
             # 如果資料表狀態值為回傳結果(將使用者選擇的檔案從網路硬碟回傳到使用者的Telegram私人訊息))
             elif request["status"] == "return_result":
-                def engineroom_job(chat_id, image_path, file_name):
-                    # 圖片上傳至 imgur
-                    nowtime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    im = pyimgur.Imgur(client_id)
-                    uploaded_image = im.upload_image(image_path, title="ImacPicture_" + file_name)
-                    # 圖片網址存入訊息文字
-                    respText = uploaded_image.link
-                    bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
                 print("-----" + request["archive_date"] + "_" + request["status"] + "-----")
                 # 特定使用者請求的存檔日期資料夾
                 all_image_list = os.listdir("//mnt/telegram/Engineroom/" + request["archive_date"])
@@ -700,8 +723,8 @@ def main():
                         break
                 # 將找到的檔名和上層路徑組合成檔案的絕對路徑
                 image_path = "//mnt/telegram/Engineroom/" + request["archive_date"] + "/" + file_name
-                # 平行處理
-                _thread.start_new_thread(engineroom_job, (request["chat_id"], image_path, file_name))
+                # 送出使用者請求的圖片
+                bot.send_photo(chat_id=request["chat_id"], photo=open(image_path, 'rb'))
                 # 使用者請求清空
                 dbEngineroomImage.update_one({"chat_id":request["chat_id"]}, {"$set":{"status":"0", "archive_date":"", "image_name":""}}, upsert=True)
     func_CameraCreate()
