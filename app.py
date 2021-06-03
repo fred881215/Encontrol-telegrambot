@@ -12,6 +12,7 @@ import requests
 import datetime
 import time
 import os
+import re
 
 # Load data from config.ini file
 config = configparser.ConfigParser()
@@ -66,20 +67,21 @@ dbWaterTank = myMongoDb['waterTank']
 dbCameraPower = myMongoDb['cameraPower']
 
 # 攝影功能
-dbCameraControl = myMongoDb['cameraControl']
 dbCameraCreate = myMongoDb['cameraCreate']
+dbCameraControl = myMongoDb['cameraControl']
 dbArchiveRequest = myMongoDb['archiveRequest']
 dbEngineroomImage = myMongoDb['engineroomImage']
 dbElectricmeterImage = myMongoDb['electricmeterImage']
-Y_check = False
 cameraCreate = False
+stepRevise = [False, None]
 cameraRevise = False
 electricmeterRevise = False
-reviseData = ""
 createList = []
+reviseData = ""
+reviseDatetime = []
 
 # 懶人遙控器鍵盤定義
-device_list = ['溫度', '濕度', 'CO2', '電流', 'DL303', 'ET7044', 'UPS', '冷氣', '環控設備' ,'遠端控制', '每日通報', '服務列表', '服務狀態', '機房輪值', '設定機房', '機房資訊', '即時拍照', '即時錄影', '調閱影片', '機房進出照']
+device_list = ['溫度', '濕度', 'CO2', '電流', 'DL303', 'ET7044', 'UPS', '冷氣', '環控設備' ,'遠端控制', '每日通報', '服務列表', '服務狀態', '機房輪值', '設定機房', '機房資訊', '即時拍照', '即時錄影', '調閱影片', '機房門禁']
 # 懶人遙控器 Emoji 定義
 emoji_list = ["\U0001F321", "\U0001F4A7", "\U00002601", "\U000026A1", '', '', "\U0001F50B", "\U00002744", "\U0001F39B" ,"\U0001F579", "\U0001F4C6", "\U0001F4CB", "\U0001F468" + "\U0000200D" + "\U0001F4BB", "\U0001F46C", "\U00002699", "\U0001F5A5", "\U0001F4F7", "\U0001F4FD", "\U0001F39E", "\U0001F3C3"]
 
@@ -271,8 +273,10 @@ def getDailyReport():
             data += "`電錶統計區間: `\n"
             data += "`" + str(datetime.datetime.strptime(str(dbCameraPower.find_one()['yesterday']['date']), '%Y-%m-%d %H:%M:%S.%f') + datetime.timedelta(hours=8)).split(" ")[0] + " ~ " + str(datetime.datetime.strptime(str(dbCameraPower.find_one()['today']['date']), '%Y-%m-%d %H:%M:%S.%f') + datetime.timedelta(hours=8)).split(" ")[0] + "`\n"
             # 攝影功能
-            data += "`當日電錶圖片: `\n"
-            data += "`" + dbElectricmeterImage.find_one({"feature":"today"})['url'] + "`\n"
+            data += "`電錶存檔日期: `\n"
+            data += dbElectricmeterImage.find_one({"feature":"today"})['archive_date'] + "\n"
+            data += "`電錶快照圖片: `\n"
+            data += dbElectricmeterImage.find_one({"feature":"today"})['url'] + "\n"
             if (len(dailyReport["error"]) > 0): tagOwner = 1
         else:
             broken = 1
@@ -285,6 +289,10 @@ def getDailyReport():
         data += "`資料快取失敗`\n"
         data += "[[昨日功耗統計]]\n"
         data += "`資料快取失敗`\n"
+        data += "[[電錶存檔日期]]\n"
+        data += dbElectricmeterImage.find_one({"feature":"today"})['archive_date'] + "\n"
+        data += "[[電錶快照圖片]]\n"
+        data += dbElectricmeterImage.find_one({"feature":"today"})['url'] + "\n"
         tagOwner = 1
 
     if (tagOwner == 1):
@@ -608,9 +616,12 @@ def reply_handler(bot, update):
     settingMode = dbDeviceCount.find_one()['setting']
     # 攝影功能
     global cameraCreate
+    global stepRevise
     global cameraRevise
     global electricmeterRevise
+    global createList
     global reviseData
+    global reviseDatetime
 
     print("settingMode = ", settingMode)
     print("data = " + text)
@@ -620,34 +631,403 @@ def reply_handler(bot, update):
     if (settingMode == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
         settingObject = dbDeviceCount.find_one()['settingObject']
         # 攝影功能
+        # 修改 攝像機 按鈕
         if text == "攝像機設定":
-            # 關閉設定機房模式
-            dbDeviceCount.update_one({}, {'$set': {'setting': False}})
-            # 刪除機房鍵盤
-            respText = '進入攝像機設定模式'
-            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = ReplyKeyboardRemove(remove_keyboard=True), parse_mode="Markdown")
+            # 設定提示文字
+            respText = '進入攝像機設定模式\n'
+            respText += '請選擇要進行的操作設定～'
             # 回傳設定按鈕
-            respText = '請選擇要進行的操作設定～'
             bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
                 [InlineKeyboardButton('新增攝像機', callback_data = "camera_setting:" + "create"),
                     InlineKeyboardButton('修改攝像機', callback_data = "camera_setting:" + "revise"),
                     InlineKeyboardButton('刪除攝像機', callback_data = "camera_setting:" + "delete")]
             ]), parse_mode="Markdown")
             return
+        # 修改 電錶資料 按鈕
         elif text == "電錶資料設定":
-            # 關閉設定機房模式
-            dbDeviceCount.update_one({}, {'$set': {'setting': False}})
-            # 刪除機房鍵盤
-            respText = '進入電錶資料設定模式'
-            bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = ReplyKeyboardRemove(remove_keyboard=True), parse_mode="Markdown")
+            # 設定提示文字
+            respText = '進入電錶資料設定模式\n'
+            respText += '請選擇要進行的操作設定～'
             # 回傳設定按鈕
-            respText = '請選擇要進行的操作設定～'
             bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton('顯示電錶資料', callback_data = "electricmeter_setting:" + "display"),
-                    InlineKeyboardButton('修改當日資料', callback_data = "electricmeter_setting:" + "revise_today"),
-                    InlineKeyboardButton('修改昨日資料', callback_data = "electricmeter_setting:" + "revise_yesterday")]
+                [InlineKeyboardButton('顯示電錶資料', callback_data = "electricmeter_setting:" + "display")],
+                [InlineKeyboardButton('修改當日資料', callback_data = "electricmeter_setting:" + "revise_today")],
+                [InlineKeyboardButton('修改昨日資料', callback_data = "electricmeter_setting:" + "revise_yesterday")]
             ]), parse_mode="Markdown")
             return
+        # 取消 設定狀態 按鈕
+        elif text == "取消設定狀態":
+            # 關閉三項功能
+            cameraCreate = False
+            stepRevise = [False, None]
+            cameraRevise = False
+            electricmeterRevise = False
+            # 清空暫存資料
+            createList = []
+            reviseData = ""
+            reviseDatetime = []
+            respText = "已取消設定狀態"
+            # 開啟設定機房鍵盤
+            bot.sendPhoto(chat_id=update.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+                [str(s) for s in setting_list[0:3]],
+                [str(s) for s in setting_list[3:6]],
+                [str(s) for s in setting_list[6:9]],
+                [str(s) for s in setting_list[9:11]]
+            ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
+            return
+        # 新增 攝像機 功能
+        elif cameraCreate == True:
+            # 修改資料插入函式
+            def cameraData_insert(text, revise_data, chat_id):
+                global stepRevise
+                global createList
+                # 在列表中間插入新的資料
+                createList.insert(revise_data, text)
+                # 關閉修改模式
+                stepRevise = [False, None]
+                # 回傳修改後的正確資料
+                respText = f"資料已更改為：[{text}], 如需再次修改請點選上一個按鈕"
+                bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
+                # 如果創建列表已經有八筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 8:
+                    cameraData_showlist(chat_id)
+                return
+            # 顯示八筆資料函式
+            def cameraData_showlist(chat_id):
+                global createList
+                # 回傳當前輸入的攝像機資料
+                respText = "=當前攝像機資料=\n"
+                respText += f"攝像機名稱：[[{createList[0]}]]\n"
+                respText += f"攝像機位置：[[{createList[1]}]]\n"
+                respText += f"網路位址：[[{createList[2]}]]\n"
+                respText += f"連接埠號：[[{createList[3]}]]\n"
+                respText += f"帳號：[[{createList[4]}]]\n"
+                respText += f"密碼：[[{createList[5]}]]\n"
+                respText += f"執行位址：[[{createList[6]}]]\n"
+                respText += f"擷取速率：[[{createList[7]}]]\n"
+                respText += "請確認上述資料是否正確"
+                # 回傳確認按鈕
+                bot.send_message(chat_id=chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("確認", callback_data = "createcamera_datacheck:" + "final_check")]
+                ]), parse_mode="Markdown")
+            respText = ""
+            # 如果創建列表為空或只有一筆資料(或進入修改模式), 且攝像機名稱, 位置不超過八個字元
+            if ((len(createList) == 0 or len(createList) == 1) and len(text) <= 8) or (len(text) <= 8 and (stepRevise[0] == True and (stepRevise[1] == 0 or stepRevise[1] == 1))):
+                # 如果使用者進入修改模式
+                if stepRevise[0] == True:
+                    # 將資料傳入cameraData_insert函式
+                    cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                    return
+                # 如果使用者正常輸入資料, 依資料筆數回傳適當的提示文字
+                elif len(createList) == 0:
+                    respText += "可以使用這個名稱～\n" + "請輸入攝像機架設位置(不可超過8個中文字)～"
+                    # 創建步驟暫存
+                    stepCreate = "0"
+                elif len(createList) == 1:
+                    respText += "可以使用這個位置～\n" + "請輸入攝像機IP位址(IPv4)～"
+                    # 創建步驟暫存
+                    stepCreate = "1"
+                # 字串加入創建列表
+                createList.append(text)
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表為空或只有一筆資料(或進入修改模式), 且攝像機名稱, 位置超過八個字元
+            elif ((len(createList) == 0 or len(createList) == 1) and len(text) > 8) or (len(text) > 8 and (stepRevise[0] == True and (stepRevise[1] == 0 or stepRevise[1] == 1))):
+                # 回傳錯誤提示文字
+                respText += "字串長度超過上限, 請確認後重新輸入～"
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                return
+            # 如果創建列表有兩筆資料(或進入修改模式), 開始檢查IP位址格式
+            elif len(createList) == 2 or (stepRevise[0] == True and stepRevise[1] == 2):
+                # 如果母字串可以用三個小數點分隔成四個子字串(IPv4)
+                if len(text.split('.')) == 4:
+                    # 用try和int(str)判斷每個子字串除了分隔點和數字以外是否有參雜其他字元
+                    try:
+                        text_ip = text.split('.')
+                        for i in range(len(text_ip)):
+                            ip = int(text_ip[i-1])
+                            # 如果四段ip值中有大於等於255(廣播位址)的值, 或ip的第一段為0
+                            if ip >= 255 or (i-1 == 0 and ip == 0):
+                                # 引發例外錯誤
+                                raise ValueError("ip error")
+                    # 如果格式錯誤回傳錯誤提示訊息
+                    except:
+                        respText += "IP格式錯誤, 請確認後重新輸入～"
+                        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                        return
+                    # 如果驗證正確回傳提示文字
+                    else:
+                        # 如果使用者進入修改模式
+                        if stepRevise[0] == True:
+                            # 將資料傳入cameraData_insert函式
+                            cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                            return
+                        # 如果使用者正常輸入資料
+                        else:
+                            respText += "位址格式正確～\n" + "請輸入攝像機Port號～"
+                            # 創建步驟暫存
+                            stepCreate = "2"
+                            createList.append(text)
+                # 如果母字串不可用三個小數點分隔成四個子字串(IPv4)
+                else:
+                    respText += "位址長度不符規範, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有三筆資料(或進入修改模式), 開始檢查Port號格式
+            elif len(createList) == 3 or (stepRevise[0] == True and stepRevise[1] == 3):
+                # 如果字串不超過五個字元(埠號預設格式)
+                if len(text) <= 5:
+                    # 驗證字串是否由數字組成
+                    try:
+                        port = int(text)
+                        # 如果port號等於0或大於規範最大值(65535)
+                        if port == 0 or port > 65535:
+                            # 引發例外錯誤
+                            raise ValueError("ip error")
+                    # 如果格式錯誤回傳錯誤提示訊息
+                    except:
+                        respText += "Port格式錯誤, 請確認後重新輸入～"
+                        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                        return
+                    # 如果驗證正確回傳提示文字
+                    else:
+                        # 如果使用者進入修改模式
+                        if stepRevise[0] == True:
+                            # 將資料傳入cameraData_insert函式
+                            cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                            return
+                        # 如果使用者正常輸入資料
+                        else:
+                            respText += "Port格式正確～\n" + "請輸入攝像機帳號(Account)～"
+                            # 創建步驟暫存
+                            stepCreate = "3"
+                            createList.append(text)
+                # 如果字串超過五個字元(埠號預設格式)
+                else:
+                    respText += "Port號長度不符規範, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有四筆資料(或進入修改模式), 開始檢查帳號格式
+            elif len(createList) == 4 or (stepRevise[0] == True and stepRevise[1] == 4):
+                text_test = re.compile(r"[A-Za-z0-9]{1,16}")
+                # 檢查字串是否符合全英文數字的正則表達式
+                if text_test.fullmatch(text):
+                    # 如果使用者進入修改模式
+                    if stepRevise[0] == True:
+                        # 將資料傳入cameraData_insert函式
+                        cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                        return
+                    # 如果使用者正常輸入資料
+                    else:
+                        respText += "請輸入攝像機密碼(Pin code)～"
+                        # 創建步驟暫存
+                        stepCreate = "4"
+                        createList.append(text)
+                else:
+                    respText += "帳號只可包含英文數字, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有五筆資料(或進入修改模式), 開始檢查密碼格式
+            elif len(createList) == 5 or (stepRevise[0] == True and stepRevise[1] == 5):
+                text_test = re.compile(r"[A-Za-z0-9]{1,16}")
+                # 檢查字串是否符合全英文數字的正則表達式
+                if text_test.fullmatch(text):
+                    # 如果使用者進入修改模式
+                    if stepRevise[0] == True:
+                        # 將資料傳入cameraData_insert函式
+                        cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                        return
+                    # 如果使用者正常輸入資料
+                    else:
+                        respText += "請輸入攝像機URL(開頭要加[/]斜線前綴)～"
+                        # 創建步驟暫存
+                        stepCreate = "5"
+                        createList.append(text)
+                else:
+                    respText += "帳號只可包含英文數字, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有六筆資料(或進入修改模式), 開始檢查URL格式
+            elif len(createList) == 6 or (stepRevise[0] == True and stepRevise[1] == 6):
+                # 如果字串開頭不是"/"斜線字元, 回傳錯誤提示訊息
+                if "/" != text[0]:
+                    respText += "URL格式錯誤, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                # 如果字串包含"/"斜線字元, 回傳提示訊息
+                else:
+                    text_test = re.compile(r"^(/)?[A-Za-z0-9_/]{1,48}")
+                    # 檢查字串是否符合開頭"/"斜線字元, 其他為英數字和斜線底線的正則表達式
+                    if text_test.fullmatch(text):
+                        # 如果使用者進入修改模式
+                        if stepRevise[0] == True:
+                            # 將資料傳入cameraData_insert函式
+                            cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                            return
+                        # 如果使用者正常輸入資料
+                        else:
+                            respText += "URL格式正確～\n" + "請輸入攝像機FPS(最大60)～"
+                            # 創建步驟暫存
+                            stepCreate = "6"
+                            createList.append(text)
+                    else:
+                        respText += "URL格式錯誤, 請確認後重新輸入～"
+                        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                        return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有七筆資料(或進入修改模式), 開始檢查FPS格式
+            elif len(createList) == 7 or (stepRevise[0] == True and stepRevise[1] == 7):
+                # 驗證字串是否由數字組成
+                try:
+                    port = int(text)
+                # 如果格式錯誤回傳錯誤提示訊息
+                except:
+                    respText += "FPS格式錯誤, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                # 如果驗證正確回傳提示文字
+                else:
+                    # 如果數字小於等於60
+                    if int(text) <= 60:
+                        # 如果使用者進入修改模式
+                        if stepRevise[0] == True:
+                            # 將資料傳入cameraData_insert函式
+                            cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                            return
+                        # 如果使用者正常輸入資料
+                        else:
+                            respText += "FPS格式正確～\n"
+                            # 創建步驟暫存
+                            stepCreate = "7"
+                            createList.append(text)
+                    else:
+                        respText += "FPS數字過大, 請確認後重新輸入～"
+                        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                        return
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 和上面的多重if分開做判斷
+            # 如果創建列表小於等於八筆資料, 傳送資料修改按鈕
+            if len(createList) <= 8:
+                respText = f"您輸入的資料為：[[{text}]], 如需修改請點選下方按鈕"
+                bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("修改", callback_data = "createcamera_datacheck:" + stepCreate)]
+                ]), parse_mode="Markdown")
+                # 如果創建列表已經有八筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 8:
+                    cameraData_showlist(update.message.chat_id)
+                return
+        # 修改 攝像機 功能
+        elif cameraRevise == True:
+            device = reviseData.split(":")[0]
+            mode = reviseData.split(":")[1]
+            # 獲取原始資料
+            origin_data = dbCameraControl.find_one({"device_number":device})
+            # 更新使用者設定的欄位資料
+            dbCameraControl.update_one({"device_number":device}, {"$set":{mode:text}}, upsert=True)
+            # 關閉修改攝像機模式
+            cameraRevise = False
+            # 修改資料清空
+            reviseData = ""
+            # 回傳提示文字
+            respText = "資料修改完成\n"
+            respText += f"欄位資料已從'{origin_data[mode]}'修改為:'{text}'"
+            # 開啟設定機房鍵盤
+            bot.sendPhoto(chat_id=update.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+                [str(s) for s in setting_list[0:3]],
+                [str(s) for s in setting_list[3:6]],
+                [str(s) for s in setting_list[6:9]],
+                [str(s) for s in setting_list[9:11]]
+            ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
+            return
+        # 修改 電錶資料 功能
+        elif electricmeterRevise == True:
+            def func_revise_mode(mode, field, text):
+                if mode == "revise_today":
+                    # 獲取原始當日資料
+                    origin_data = dbElectricmeterImage.find_one({"feature":"today"})
+                    # 更新使用者設定的欄位資料
+                    dbElectricmeterImage.update_one({"feature":"today"}, {"$set":{field:text}}, upsert=True)
+                elif mode == "revise_yesterday":
+                    # 獲取原始昨日資料
+                    origin_data = dbElectricmeterImage.find_one({"feature":"yesterday"})
+                    # 更新使用者設定的欄位資料
+                    dbElectricmeterImage.update_one({"feature":"yesterday"}, {"$set":{field:text}}, upsert=True)
+                # 設定提示文字
+                respText = "資料修改完成\n"
+                respText += f"欄位資料已從'{origin_data[field]}'修改為:'{text}'"
+                return respText
+            mode = reviseData.split(":")[0]
+            field = reviseData.split(":")[1]
+            # 如果要修改的欄位為電錶度數
+            if field == "kWh":
+                try:
+                    # 驗證使用者輸入的資料是否可轉為整數
+                    data_test = int(text)
+                except:
+                    # 如果不行,  回傳錯誤提示文字
+                    respText = "資料格式不符, 請確認後重新嘗試"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                else:
+                    # 驗證成功時將資料轉入資料庫修改函式, 並傳回提示文字
+                    respText = func_revise_mode(mode, field, text)
+            # 如果要修改的欄位為紀錄時間
+            elif field == "archive_date":
+                # 如果使用者輸入的年份字串長度為4, 且轉為整數後大於等於2000年
+                if len(reviseDatetime) == 0 and len(text) == 4 and int(text) >= 2000:
+                    # 添加年份字串入暫存陣列
+                    reviseDatetime.append(text)
+                    # 回傳提示文字後等待使用者輸入
+                    respText = "年份格式正確, 請輸入要修改的月份"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                # 如果使用者輸入的月份字串長度小於等於2, 轉為整數後小於等於12月, 且不為0
+                elif len(reviseDatetime) == 1 and len(text) <= 2 and int(text) <= 12 and int(text) != 0:
+                    # 如果月份字串長度等於1
+                    if len(text) == 1:
+                        # 在單月前面補0
+                        text = "0" + text
+                    # 添加月份字串入暫存陣列
+                    reviseDatetime.append(text)
+                    # 回傳提示文字後等待使用者輸入
+                    respText = "月份格式正確, 請輸入要修改的日期"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+                # 如果使用者輸入的日期字串長度小於等於2, 轉為整數後小於等於31日, 且不為0
+                elif len(reviseDatetime) == 2 and len(text) <= 2 and int(text) <= 31 and int(text) != 0:
+                    # 如果日期字串長度等於1
+                    if len(text) == 1:
+                        # 在單日前面補0
+                        text = "0" + text
+                    # 添加日期字串入暫存陣列
+                    reviseDatetime.append(text)
+                    # 整理年月日三個陣列元素存入字串, 中間用 "-" 分隔
+                    text = reviseDatetime[0] + "-" + reviseDatetime[1] + "-" + reviseDatetime[2]
+                    # 輸入完成後將資料轉入資料庫修改函式, 並傳回提示文字
+                    respText = func_revise_mode(mode, field, text)
+                # 如果使用者輸入的字串不符上述規則
+                else:
+                    # 回傳錯誤提示文字
+                    respText = "資料格式不符, 請確認後重新嘗試"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
+            # 關閉修改攝像機模式
+            electricmeterRevise = False
+            # 修改資料清空
+            reviseData = ""
+            reviseDatetime = []
+            # 開啟設定機房鍵盤
+            bot.sendPhoto(chat_id=update.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+                [str(s) for s in setting_list[0:3]],
+                [str(s) for s in setting_list[3:6]],
+                [str(s) for s in setting_list[6:9]],
+                [str(s) for s in setting_list[9:11]]
+            ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
+            return
+
         elif (text in setting_list[:-1]):
             dbDeviceCount.update_one({}, {'$set': {'settingObject': text}})
             respText = "`請輸入" + text + "數量~`"
@@ -656,6 +1036,15 @@ def reply_handler(bot, update):
             respText += "----------------------------------\n"
             respText += "`您已離開機房資訊設定模式~`"
             dbDeviceCount.update_one({}, {'$set': {'setting': False}})
+            # 關閉三項功能
+            cameraCreate = False
+            stepRevise = [False, None]
+            cameraRevise = False
+            electricmeterRevise = False
+            # 清空暫存資料
+            createList = []
+            reviseData = ""
+            reviseDatetime = []
             bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = ReplyKeyboardRemove(remove_keyboard=True), parse_mode="Markdown")
             return
         elif (settingObject != ""):
@@ -681,171 +1070,6 @@ def reply_handler(bot, update):
             respText = '`關閉設定模式，請輸入 \"離開設定狀態\"`'
         bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
         return
-
-    # 攝影功能
-    # 新增 攝像機 功能
-    elif (cameraCreate == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
-        global Y_check
-        global createList
-        # 如果使用者同意進入新增攝像機模式
-        if text == "Y" or text == "y":
-            respText = "如果要離開新增模式, 請輸入:(N/n)或(exit)\n" + "請輸入攝像機名稱(不可超過8個中文字)～"
-            # 開啟同意確認
-            Y_check = True
-        # 如果使用者想要離開新增攝像機模式
-        elif text == "N" or text == "n" or text == "exit":
-            respText = "已離開新增攝像機模式～"
-            # 關閉同意確認和新增攝像機模式
-            Y_check = False
-            cameraCreate = False
-            # 創建列表清空
-            createList = []
-        # 如果創建列表暫存的資料不超過8筆, 且經過同意確認
-        elif len(createList) < 8 and Y_check == True:
-            respText = ""
-            # 如果創建列表為空或只有一筆資料, 且攝像機名稱, 位置不超過八個字元
-            if ((len(createList) == 0 or len(createList) == 1) and len(text) <= 8):
-                # 依資料筆數回傳適當的提示文字
-                if len(createList) == 0:
-                    respText += "可以使用這個名稱～\n" + "請輸入攝像機架設位置(不可超過8個中文字)～"
-                elif len(createList) == 1:
-                    respText += "可以使用這個位置～\n" + "請輸入攝像機IP位址(IPv4)～"
-                # 字串加入創建列表
-                createList.append(text)
-            # 如果創建列表為空或只有一筆資料, 且攝像機名稱, 位置超過八個字元
-            elif ((len(createList) == 0 or len(createList) == 1) and len(text) > 8):
-                # 回傳錯誤提示文字
-                respText += "字串長度超過上限, 請確認後重新輸入～"
-            # 如果創建列表有兩筆資料, 開始檢查IP位址格式
-            elif len(createList) == 2:
-                # 如果母字串可以用三個小數點分隔成四個子字串(IPv4)
-                if len(text.split('.')) == 4:
-                    # 用try和int(str)判斷每個子字串除了分隔點和數字以外是否有參雜其他字元
-                    try:
-                        text_ip = text.split('.')
-                        for i in range(len(text_ip)):
-                            ip = int(text_ip[i])
-                    # 如果格式錯誤回傳錯誤提示訊息
-                    except:
-                        respText += "IP格式錯誤, 請確認後重新輸入～"
-                    # 如果驗證正確回傳提示文字
-                    else:
-                        respText += "位址格式正確～\n" + "請輸入攝像機Port號～"
-                        createList.append(text)
-                # 如果母字串不可用三個小數點分隔成四個子字串(IPv4)
-                else:
-                    respText += "位址長度不符規範, 請確認後重新輸入～"
-            # 如果創建列表有三筆資料, 開始檢查Port號格式
-            elif len(createList) == 3:
-                # 如果字串不超過五個字元(埠號預設格式)
-                if len(text) <= 5:
-                    # 驗證字串是否由數字組成
-                    try:
-                        port = int(text)
-                    # 如果格式錯誤回傳錯誤提示訊息
-                    except:
-                        respText += "Port格式錯誤, 請確認後重新輸入～"
-                    # 如果驗證正確回傳提示文字
-                    else:
-                        respText += "Port格式正確～\n" + "請輸入攝像機帳號(Account)～"
-                        createList.append(text)
-                # 如果字串超過五個字元(埠號預設格式)
-                else:
-                    respText += "Port號長度不符規範, 請確認後重新輸入～"
-            # 如果創建列表有四筆資料, 存入帳號字串
-            elif len(createList) == 4:
-                respText += "請輸入攝像機密碼(Pin code)～"
-                createList.append(text)
-            # 如果創建列表有五筆資料, 存入密碼字串
-            elif len(createList) == 5:
-                respText += "請輸入攝像機URL(開頭不用加[/]斜線前綴)～"
-                createList.append(text)
-            # 如果創建列表有六筆資料, 開始檢查URL格式
-            elif len(createList) == 6:
-                # 如果字串不包含"/"斜線字元, 回傳錯誤提示訊息
-                if "/" not in text:
-                    respText += "URL格式錯誤, 請確認後重新輸入～"
-                # 如果字串包含"/"斜線字元, 回傳提示訊息
-                else:
-                    respText += "URL格式正確～\n" + "請輸入攝像機FPS(最大60)～"
-                    createList.append(text)
-            # 如果創建列表有七筆資料, 開始檢查FPS格式
-            elif len(createList) == 7:
-                # 驗證字串是否由數字組成
-                try:
-                    port = int(text)
-                # 如果格式錯誤回傳錯誤提示訊息
-                except:
-                    respText += "FPS格式錯誤, 請確認後重新輸入～"
-                # 如果驗證正確回傳提示文字
-                else:
-                    # 如果數字小於等於60
-                    if int(text) <= 60:
-                        respText += "FPS格式正確～\n"
-                        createList.append(text)
-                    else:
-                        respText += "FPS數字過大, 請確認後重新輸入～"
-            print(createList)
-            # 和上面的多重if分開做判斷
-            # 如果創建列表有七筆資料, 將資料存入對應欄位並傳送到資料庫
-            if len(createList) == 8:
-                respText += "資料已傳送, 請等待Server端進行資料驗證～"
-                # upsert新的資料表, 用來存使用者傳過去的攝像機資料, 本機端再抓出來驗證
-                dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "account":createList[4], "pin_code":createList[5], "url":createList[6], "fps":createList[7], "chat_id":update.message.chat_id}}, upsert=True)
-                print("Request send")
-                # 關閉同意確認和新增攝像機模式
-                Y_check = False
-                cameraCreate = False
-                # 創建列表清空
-                createList = []
-        # 如果使用者輸入字串不是同意或拒絕
-        else:
-            # 回傳錯誤提示文字
-            respText = "無效的指令, 請回應(Y/N)～"
-        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
-        return
-
-    # 修改 攝像機 功能
-    elif (cameraRevise == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
-        device = reviseData.split(":")[0]
-        mode = reviseData.split(":")[1]
-        # 獲取原始資料
-        origin_data = dbCameraControl.find_one({"device_number":device})
-        # 更新使用者設定的欄位資料
-        dbCameraControl.update_one({"device_number":device}, {"$set":{mode:text}}, upsert=True)
-        # 關閉修改攝像機模式
-        cameraRevise = False
-        # 修改資料清空
-        reviseData = ""
-        # 回傳提示文字
-        respText = "資料修改完成\n"
-        respText += f"欄位資料已從'{origin_data[mode]}'修改為:'{text}'"
-        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
-
-    # 修改 電錶資料 功能
-    elif (electricmeterRevise == True and (update.message.chat_id == devUser_id or update.message.chat_id == group_id)):
-        mode = reviseData.split(":")[0]
-        field = reviseData.split(":")[1]
-        # 如果請求為修改當日電錶資料
-        if mode == "revise_today":
-            # 獲取原始當日資料
-            origin_data = dbElectricmeterImage.find_one({"feature":"today"})
-            # 更新使用者設定的欄位資料
-            dbElectricmeterImage.update_one({"feature":"today"}, {"$set":{field:text}}, upsert=True)
-        # 如果請求為修改昨日電錶資料
-        elif mode == "revise_yesterday":
-            # 獲取原始昨日資料
-            origin_data = dbElectricmeterImage.find_one({"feature":"yesterday"})
-            # 更新使用者設定的欄位資料
-            dbElectricmeterImage.update_one({"feature":"yesterday"}, {"$set":{field:text}}, upsert=True)
-        # 關閉修改攝像機模式
-        cameraRevise = False
-        # 修改資料清空
-        reviseData = ""
-        # 回傳提示文字
-        respText = "資料修改完成\n"
-        respText += f"欄位資料已從'{origin_data[field]}'修改為:'{text}'"
-        bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
 
     # 開啟 懶人遙控器鍵盤
     elif (text == '輔助鍵盤'):
@@ -1067,8 +1291,8 @@ def reply_handler(bot, update):
         ]), parse_mode="Markdown")
         return
 
-    elif (text in ["機房進出照", "\U0001F3C3\n機房進出照"]):
-        respText = "請選擇照片存檔年份～"
+    elif (text in ["機房門禁", "\U0001F3C3\n機房門禁"]):
+        respText = "請選擇機房人員進出年份～"
         # 設定基底年份
         base_year = 2020
         # 獲取當前年份
@@ -1275,11 +1499,15 @@ def camera_setting(bot, update):
     mode = update.callback_query.data.split(':')[1]
     # 如果設定模式為新增攝像機
     if mode == "create":
-        respText = '是否開始新增攝像機？(Y/N)'
+        respText = "請輸入攝像機名稱(不可超過8個中文字)～\n"
+        respText += "如果想取消當前設定, 請點按鍵盤[取消設定狀態]按鈕～"
         # 開啟新增攝像機模式
         global cameraCreate
         cameraCreate = True
-        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+        # 傳送取消設定狀態按鈕鍵盤
+        bot.sendPhoto(chat_id=update.callback_query.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+            ["取消設定狀態"]
+        ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
     # 如果設定模式為修改, 刪除攝像機
     elif mode == "revise" or mode == "delete":
         # 宣告攝像機號碼清單
@@ -1308,17 +1536,29 @@ def camera_process(bot, update):
     mode = update.callback_query.data.split(':')[2]
     # 如果設定模式為修改攝像機
     if mode == "revise":
-        respText = "請選擇要修改的欄位～"
+        # 回傳該攝像機所有欄位資料
+        camera_data = dbCameraControl.find_one({"device_number":device})
+        respText = "=攝像機欄位資料=\n"
+        respText += f"攝像機名稱：[[{camera_data['device_name']}]]\n"
+        respText += f"攝像機位置：[[{camera_data['device_location']}]]\n"
+        respText += f"網路位址：[[{camera_data['device_ip']}]]\n"
+        respText += f"連接埠號：[[{camera_data['device_port']}]]\n"
+        respText += f"帳號：[[{camera_data['account']}]]\n"
+        respText += f"密碼：[[{camera_data['pin_code']}]]\n"
+        respText += f"執行位址：[[{camera_data['url']}]]\n"
+        respText += f"擷取速率：[[{camera_data['fps']}]]"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
         # 回傳修改欄位選取按鈕
+        respText = "請選擇要修改的欄位～"
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton('名稱(name)', callback_data = "revise_process:" + device + ":" + "device_name"),
-                InlineKeyboardButton('位置(location)', callback_data = "revise_process:" + device + ":" + "device_location"),
-                InlineKeyboardButton('網路位址(IP)', callback_data = "revise_process:" + device + ":" + "device_ip")],
-            [InlineKeyboardButton('連接埠號(Port)', callback_data = "revise_process:" + device + ":" + "device_port"),
-                InlineKeyboardButton('帳號(Account)', callback_data = "revise_process:" + device + ":" + "account"),
-                InlineKeyboardButton('密碼(Pincode)', callback_data = "revise_process:" + device + ":" + "pin_code")],
-            [InlineKeyboardButton('執行位址(Url)', callback_data = "revise_process:" + device + ":" + "url"),
-                InlineKeyboardButton('擷取速率(FPS)', callback_data = "revise_process:" + device + ":" + "fps")]
+            [InlineKeyboardButton('名稱', callback_data = "revise_process:" + device + ":" + "device_name"),
+                InlineKeyboardButton('位置', callback_data = "revise_process:" + device + ":" + "device_location"),
+                InlineKeyboardButton('網路位址', callback_data = "revise_process:" + device + ":" + "device_ip"),
+                InlineKeyboardButton('連接埠號', callback_data = "revise_process:" + device + ":" + "device_port")],
+            [InlineKeyboardButton('帳號', callback_data = "revise_process:" + device + ":" + "account"),
+                InlineKeyboardButton('密碼', callback_data = "revise_process:" + device + ":" + "pin_code"),
+                InlineKeyboardButton('執行位址', callback_data = "revise_process:" + device + ":" + "url"),
+                InlineKeyboardButton('擷取速率', callback_data = "revise_process:" + device + ":" + "fps")]
         ]), parse_mode="Markdown")
     # 如果設定模式為刪除攝像機
     elif mode == "delete":
@@ -1333,14 +1573,18 @@ def revise_process(bot, update):
     device = update.callback_query.data.split(':')[1]
     mode = update.callback_query.data.split(':')[2]
     respText = f"當前選擇的欄位為:[{mode}]\n"
-    respText += "請輸入要修改的資料～"
+    respText += "請輸入要修改的資料～\n"
+    respText += "如果想取消當前設定, 請點按鍵盤[取消設定狀態]按鈕～"
     # 開啟修改攝像機模式
     global cameraRevise
     global reviseData
     cameraRevise = True
     reviseData = device + ":" + mode
-    # 回傳提示文字後等待使用者輸入
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    # 傳送取消設定狀態按鈕鍵盤
+    bot.sendPhoto(chat_id=update.callback_query.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+        ["取消設定狀態"]
+    ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
+    return
 
 # 電錶資料設定 按鈕鍵盤 callback
 def electricmeter_setting(bot, update):
@@ -1371,14 +1615,20 @@ def electricmeter_process(bot, update):
     mode = update.callback_query.data.split(':')[1]
     field = update.callback_query.data.split(':')[2]
     respText = f"當前選擇的欄位為:[{field}]\n"
-    respText += "請輸入要修改的資料～"
+    if field == "kWh":
+        respText += "請輸入要修改的電錶度數～\n"
+    elif field == "archive_date":
+        respText += "請輸入要修改的年份～\n"
+    respText += "如果想取消當前設定, 請點按鍵盤[取消設定狀態]按鈕～"
     # 開啟電錶資料修改模式
     global electricmeterRevise
     global reviseData
     electricmeterRevise = True
     reviseData = mode + ":" + field
-    # 回傳提示文字後等待使用者輸入
-    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    # 傳送取消設定狀態按鈕鍵盤
+    bot.sendPhoto(chat_id=update.callback_query.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+        ["取消設定狀態"]
+    ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
 
 # 影像模式 按鈕鍵盤 callback
 def camera_select(bot, update):
@@ -1427,7 +1677,7 @@ def video_second(bot, update):
 def archive_month(bot,update):
     device = update.callback_query.data.split(':')[1]
     year = update.callback_query.data.split(':')[2]
-    # 如果使用者從機房進出照的按鈕callback跳轉過來
+    # 如果使用者從機房門禁的按鈕callback跳轉過來
     if device == "engineroom":
         # 上傳使用者調取照片存檔請求
         dbEngineroomImage.update_one({"chat_id":update.callback_query.message.chat_id}, {"$set":{"status":"request_month", "archive_date":year}}, upsert=True)
@@ -1572,6 +1822,44 @@ def archive_check(bot, update):
     bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
     return
 
+# 資料確認(創建攝像機) 按鈕鍵盤 callback
+def createcamera_datacheck(bot, update):
+    step = update.callback_query.data.split(':')[1]
+    global createList
+    try:
+        # 測試step是否可轉為整數
+        int(step)
+    except:
+        # 如果不能轉為整數, 代表step的資料為最後確認
+        respText = "資料已傳送, 請等待Server端進行資料驗證～"
+        # upsert新的資料表, 用來存使用者傳過去的攝像機資料, 本機端再抓出來驗證
+        dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "account":createList[4], "pin_code":createList[5], "url":createList[6], "fps":createList[7], "chat_id":update.callback_query.message.chat_id}}, upsert=True)
+        # 匯入創建攝像機模式全域變數
+        global cameraCreate
+        # 關閉新增攝像機模式
+        cameraCreate = False
+        # 創建列表清空
+        createList = []
+        # 開啟設定機房鍵盤
+        bot.sendPhoto(chat_id=update.callback_query.message.chat_id, caption=respText, reply_markup = ReplyKeyboardMarkup([
+            [str(s) for s in setting_list[0:3]],
+            [str(s) for s in setting_list[3:6]],
+            [str(s) for s in setting_list[6:9]],
+            [str(s) for s in setting_list[9:11]]
+        ], resize_keyboard=True), photo=open('./keyboard.jpg', 'rb'), parse_mode="Markdown")
+    else:
+        # 如果可以轉為整數, 代表step的資料為修改資料
+        # 匯入修正模式全域變數
+        global stepRevise
+        # 刪除該筆資料
+        del createList[int(step)]
+        # 開啟修正模式
+        stepRevise = [True, int(step)]
+        # 回傳提示訊息
+        respText = "請重新輸入正確的資料"
+        bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    return
+
 updater = Updater(token=(config['TELEGRAM']['ACCESS_TOKEN']), use_context=False)
 
 # Add handler for handling message, there are many kinds of message. For this handler, it particular handle text
@@ -1602,6 +1890,7 @@ updater.dispatcher.add_handler(CallbackQueryHandler(archive_day, pattern=r'archi
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_hour, pattern=r'archive_hour'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_all, pattern=r'archive_all'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_check, pattern=r'archive_check'))
+updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_datacheck, pattern=r'createcamera_datacheck'))
 
 TOKEN = config['TELEGRAM']['ACCESS_TOKEN']
 PORT = int(os.environ.get('PORT', '8443'))
