@@ -210,6 +210,12 @@ def main():
                         elif video_file == all_video_list[-1]:
                             # 增加紅色打叉圖案後結束子迴圈, 繼續跑父迴圈
                             unicode_emoji_list.append("\U0000274C")
+                # 如果圖案數量和最大月份對不上
+                if len(unicode_emoji_list) != len(max_month):
+                    emoji = len(max_month) - len(unicode_emoji_list)
+                    for i in range(0, emoji):
+                        # 用紅色打叉圖案後補上
+                        unicode_emoji_list.append("\U0000274C")
                 # 回傳當前選取狀態文字提示
                 respText = "請選擇影片存檔月份～"
                 bot.send_message(chat_id=request["chat_id"], text=respText, reply_markup = InlineKeyboardMarkup([
