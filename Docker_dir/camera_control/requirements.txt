@@ -1,0 +1,7 @@
+python-telegram-bot==13.4.1
+pyimgur==0.6.0
+pymongo==3.11.2
+dnspython==2.0.0
+schedule==1.0.0
+sockets
+opencv-python==4.5.1.48
