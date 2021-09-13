@@ -17,16 +17,6 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
 RUN pip3 install wheel
 RUN pip3 install --upgrade pip
 
-# 安裝 nfs 客戶端
-RUN apt-get install -y nfs-common
-
-# 安裝 opencv
-RUN apt-get install -y python-opencv
-
-# 建立 nfs 資料夾
-RUN service rpcbind start
-RUN mkdir -p //mnt/telegram
-
 # 建立工作目錄
 RUN mkdir /app
 
