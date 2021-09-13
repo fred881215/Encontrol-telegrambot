@@ -24,11 +24,6 @@ RUN TZ=Asia/Taipei \
 RUN pip3 install wheel
 RUN pip3 install --upgrade pip
 
-# 安裝 nfs 客戶端
-RUN apt-get install -y nfs-common
-
-# 建立 nfs 資料夾
-RUN service rpcbind start
 RUN mkdir -p //mnt/telegram
 
 # 建立工作目錄
