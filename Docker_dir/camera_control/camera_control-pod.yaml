@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: camera-control-pod
+  namespace: default
+  labels:
+    app: camera-control
+spec:
+  containers:
+  - image: bydufish/camera_control
+    name: camera-control
