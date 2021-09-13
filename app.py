@@ -807,7 +807,10 @@ def reply_handler(bot, update):
                     respText += "Port號長度不符規範, 請確認後重新輸入～"
                     bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
                     return
-                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                # 帳號密碼留空選項按鈕
+                bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("不設定帳號密碼", callback_data = "createcamera_datanull:" + "null")]
+                ]), parse_mode="Markdown")
             # 如果創建列表有四筆資料(或進入修改模式), 開始檢查帳號格式
             elif len(createList) == 4 or (stepRevise[0] == True and stepRevise[1] == 4):
                 text_test = re.compile(r"[A-Za-z0-9]{1,16}")
@@ -859,7 +862,7 @@ def reply_handler(bot, update):
                     return
                 # 如果字串包含"/"斜線字元, 回傳提示訊息
                 else:
-                    text_test = re.compile(r"^(/)?[A-Za-z0-9_/]{1,48}")
+                    text_test = re.compile(r"^(/)?[A-Za-z0-9_/.]{1,48}")
                     # 檢查字串是否符合開頭"/"斜線字元, 其他為英數字和斜線底線的正則表達式
                     if text_test.fullmatch(text):
                         # 如果使用者進入修改模式
@@ -1860,6 +1863,15 @@ def createcamera_datacheck(bot, update):
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
+# 帳號密碼留空(創建攝像機) 按鈕鍵盤 callback
+def createcamera_datanull(bot, update):
+    global createList
+    createList.append("null") # 帳號
+    createList.append("null") # 密碼
+    respText = "請輸入攝像機URL(開頭要加[/]斜線前綴)～"
+    bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
+    return
+
 updater = Updater(token=(config['TELEGRAM']['ACCESS_TOKEN']), use_context=False)
 
 # Add handler for handling message, there are many kinds of message. For this handler, it particular handle text
@@ -1891,6 +1903,7 @@ updater.dispatcher.add_handler(CallbackQueryHandler(archive_hour, pattern=r'arch
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_all, pattern=r'archive_all'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_check, pattern=r'archive_check'))
 updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_datacheck, pattern=r'createcamera_datacheck'))
+updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_datanull, pattern=r'createcamera_datanull'))
 
 TOKEN = config['TELEGRAM']['ACCESS_TOKEN']
 PORT = int(os.environ.get('PORT', '8443'))
