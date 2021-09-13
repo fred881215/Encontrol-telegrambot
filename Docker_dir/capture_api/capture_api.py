@@ -46,7 +46,7 @@ def Electricmeter_upload():
         image_file.save(File_path + image_file.filename)
         # 圖片上傳至 imgur 後刪除本地存檔
         im = pyimgur.Imgur(client_id)
-        uploaded_image = im.upload_image(image_file.filename, title="ImacPicture_" + image_file.filename)
+        uploaded_image = im.upload_image(File_path + image_file.filename, title="ImacPicture_" + image_file.filename)
         os.remove(image_file.filename)
         # 取出昨天存的當日電錶圖片資料
         yesterday_data = dbElectricmeterImage.find_one({"feature":"today"})
