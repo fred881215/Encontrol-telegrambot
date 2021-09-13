@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: camera-create-pod
+  namespace: default
+  labels:
+    app: camera-create
+spec:
+  containers:
+  - image: bydufish/camera_create
+    name: camera-create
