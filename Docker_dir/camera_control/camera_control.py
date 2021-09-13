@@ -58,7 +58,10 @@ def main():
                 result = socket_connection(request["device_ip"], int(request["device_port"]))
                 if result == 0:
                     # 將欄位資料組合成 rtsp 協定格式的 url, 供 opencv 導入攝像機
-                    url = f"rtsp://{request['account']}:{request['pin_code']}@{request['device_ip']}:{request['device_port']}{request['url']}"
+                    if request['account'] == "null" and request['pin_code'] == "null":
+                        url = f"rtsp://{request['device_ip']}:{request['device_port']}{request['url']}"
+                    else:
+                        url = f"rtsp://{request['account']}:{request['pin_code']}@{request['device_ip']}:{request['device_port']}{request['url']}"
                     # 拍照功能
                     if request["status"] == "intime_photo":
                         # 導入攝像機
