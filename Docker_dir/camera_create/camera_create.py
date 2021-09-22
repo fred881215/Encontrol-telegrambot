@@ -47,7 +47,7 @@ def main():
                 respText = "攝像機新增完成～"
                 # 新增攝像機資料, 編號自動遞增
                 count_list = len([i for i in dbCameraControl.find()])
-                dbCameraControl.update_one({"device_number":str(count_list+1)}, {"$set":{"status":"0", "device_name":request["name"], "device_location":request["location"], "device_ip":request["ip"], "device_port":request["port"], "account":request["account"], "pin_code":request["pin_code"], "url":request["url"], "fps":request["fps"], "video_second":"", "chat_id":"", "connection":"0"}}, upsert=True)
+                dbCameraControl.update_one({"device_number":str(count_list+1)}, {"$set":{"status":"0", "device_name":request["name"], "device_location":request["location"], "device_ip":request["ip"], "device_port":request["port"], "account":request["account"], "pin_code":request["pin_code"], "url":request["url"], "fps":request["fps"], "nfs_dir":request["nfs_dir"], "video_second":"", "chat_id":"", "connection":"0"}}, upsert=True)
             else:
                 respText = "該位址無法連通, 請修正後重新嘗試～"
             # 測試結果回傳給使用者
