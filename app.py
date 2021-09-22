@@ -688,11 +688,11 @@ def reply_handler(bot, update):
                 # 回傳修改後的正確資料
                 respText = f"資料已更改為：[{text}], 如需再次修改請點選上一個按鈕"
                 bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
-                # 如果創建列表已經有八筆資料, 將資料傳入cameraData_showlist函式
-                if len(createList) == 8:
+                # 如果創建列表已經有九筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 9:
                     cameraData_showlist(chat_id)
                 return
-            # 顯示八筆資料函式
+            # 顯示九筆資料函式
             def cameraData_showlist(chat_id):
                 global createList
                 # 回傳當前輸入的攝像機資料
@@ -705,6 +705,7 @@ def reply_handler(bot, update):
                 respText += f"密碼：[[{createList[5]}]]\n"
                 respText += f"執行位址：[[{createList[6]}]]\n"
                 respText += f"擷取速率：[[{createList[7]}]]\n"
+                respText += f"存檔位址：[[{createList[8]}]]\n"
                 respText += "請確認上述資料是否正確"
                 # 回傳確認按鈕
                 bot.send_message(chat_id=chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
@@ -902,7 +903,7 @@ def reply_handler(bot, update):
                             return
                         # 如果使用者正常輸入資料
                         else:
-                            respText += "FPS格式正確～\n"
+                            respText += "FPS格式正確～\n" + "請輸入攝像機存檔位址(NFS資料夾名稱)～"
                             # 創建步驟暫存
                             stepCreate = "7"
                             createList.append(text)
@@ -911,15 +912,29 @@ def reply_handler(bot, update):
                         bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
                         return
                 bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有八筆資料(或進入修改模式), 開始檢查NFS格式
+            elif len(createList) == 8 or (stepRevise[0] == True and stepRevise[1] == 8):
+                # 如果使用者進入修改模式
+                if stepRevise[0] == True:
+                    # 將資料傳入cameraData_insert函式
+                    cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                    return
+                # 如果使用者正常輸入資料
+                else:
+                    respText += "NFS格式正確～\n"
+                    # 創建步驟暫存
+                    stepCreate = "8"
+                    createList.append(text)
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
             # 和上面的多重if分開做判斷
-            # 如果創建列表小於等於八筆資料, 傳送資料修改按鈕
-            if len(createList) <= 8:
+            # 如果創建列表小於等於九筆資料, 傳送資料修改按鈕
+            if len(createList) <= 9:
                 respText = f"您輸入的資料為：[[{text}]], 如需修改請點選下方按鈕"
                 bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("修改", callback_data = "createcamera_datacheck:" + stepCreate)]
                 ]), parse_mode="Markdown")
-                # 如果創建列表已經有八筆資料, 將資料傳入cameraData_showlist函式
-                if len(createList) == 8:
+                # 如果創建列表已經有九筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 9:
                     cameraData_showlist(update.message.chat_id)
                 return
         # 修改 攝像機 功能
