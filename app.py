@@ -688,11 +688,11 @@ def reply_handler(bot, update):
                 # 回傳修改後的正確資料
                 respText = f"資料已更改為：[{text}], 如需再次修改請點選上一個按鈕"
                 bot.send_message(chat_id=chat_id, text=respText, parse_mode="Markdown")
-                # 如果創建列表已經有九筆資料, 將資料傳入cameraData_showlist函式
-                if len(createList) == 9:
+                # 如果創建列表已經有十筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 10:
                     cameraData_showlist(chat_id)
                 return
-            # 顯示九筆資料函式
+            # 顯示十筆資料函式
             def cameraData_showlist(chat_id):
                 global createList
                 # 回傳當前輸入的攝像機資料
@@ -705,7 +705,8 @@ def reply_handler(bot, update):
                 respText += f"密碼：[[{createList[5]}]]\n"
                 respText += f"執行位址：[[{createList[6]}]]\n"
                 respText += f"擷取速率：[[{createList[7]}]]\n"
-                respText += f"存檔位址：[[{createList[8]}]]\n"
+                respText += f"存檔容量：[[{createList[8]}]]\n"
+                respText += f"存檔位址：[[{createList[9]}]]\n"
                 respText += "請確認上述資料是否正確"
                 # 回傳確認按鈕
                 bot.send_message(chat_id=chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
@@ -810,7 +811,7 @@ def reply_handler(bot, update):
                     return
                 # 帳號密碼留空選項按鈕
                 bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("不設定帳號密碼", callback_data = "createcamera_datanull:" + "null")]
+                    [InlineKeyboardButton("不設定帳號密碼", callback_data = "createcamera_otherbutton:" + "null")]
                 ]), parse_mode="Markdown")
             # 如果創建列表有四筆資料(或進入修改模式), 開始檢查帳號格式
             elif len(createList) == 4 or (stepRevise[0] == True and stepRevise[1] == 4):
@@ -903,7 +904,7 @@ def reply_handler(bot, update):
                             return
                         # 如果使用者正常輸入資料
                         else:
-                            respText += "FPS格式正確～\n" + "請輸入攝像機存檔位址(NFS資料夾名稱)～"
+                            respText += "FPS格式正確～\n" + "請輸入最大存檔容量(單位/GB, 超過最大容量時將自動刪除最舊存檔)～"
                             # 創建步驟暫存
                             stepCreate = "7"
                             createList.append(text)
@@ -911,30 +912,63 @@ def reply_handler(bot, update):
                         respText += "FPS數字過大, 請確認後重新輸入～"
                         bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
                         return
-                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
-            # 如果創建列表有八筆資料(或進入修改模式), 開始檢查NFS格式
+                # 預設容量大小按鈕
+                bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("使用預設容量(400GB)", callback_data = "createcamera_otherbutton:" + "default_GB")]
+                ]), parse_mode="Markdown")
+            # 如果創建列表有八筆資料(或進入修改模式), 開始檢查最大存檔容量格式
             elif len(createList) == 8 or (stepRevise[0] == True and stepRevise[1] == 8):
-                # 如果使用者進入修改模式
-                if stepRevise[0] == True:
-                    # 將資料傳入cameraData_insert函式
-                    cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                # 驗證字串是否由數字組成
+                try:
+                    storage_size = int(text)
+                # 如果格式錯誤回傳錯誤提示訊息
+                except:
+                    respText += "容量格式錯誤, 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
                     return
-                # 如果使用者正常輸入資料
                 else:
-                    respText += "NFS格式正確～\n"
-                    # 創建步驟暫存
-                    stepCreate = "8"
-                    createList.append(text)
+                    # 如果使用者進入修改模式
+                    if stepRevise[0] == True:
+                        # 將資料傳入cameraData_insert函式
+                        cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                        return
+                    # 如果使用者正常輸入資料
+                    else:
+                        respText += "容量格式正確～\n" + "請輸入錄影檔存檔位址(NFS資料夾名稱)～"
+                        # 創建步驟暫存
+                        stepCreate = "8"
+                        createList.append(text)
+                bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+            # 如果創建列表有九筆資料(或進入修改模式), 開始檢查NFS格式
+            elif len(createList) == 9 or (stepRevise[0] == True and stepRevise[1] == 9):
+                text_test = re.compile(r"[A-Za-z0-9-.]{1,48}")
+                # 檢查字串是否符合全英文數字的正則表達式
+                if text_test.fullmatch(text):
+                    # 如果使用者進入修改模式
+                    if stepRevise[0] == True:
+                        # 將資料傳入cameraData_insert函式
+                        cameraData_insert(text, stepRevise[1], update.message.chat_id)
+                        return
+                    # 如果使用者正常輸入資料
+                    else:
+                        respText += "NFS格式正確～\n"
+                        # 創建步驟暫存
+                        stepCreate = "9"
+                        createList.append(text)
+                else:
+                    respText += "NFS資料夾名稱只可包含英文數字及符號[-.], 請確認後重新輸入～"
+                    bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
+                    return
                 bot.send_message(chat_id=update.message.chat_id, text=respText, parse_mode="Markdown")
             # 和上面的多重if分開做判斷
-            # 如果創建列表小於等於九筆資料, 傳送資料修改按鈕
-            if len(createList) <= 9:
+            # 如果創建列表小於等於十筆資料, 傳送資料修改按鈕
+            if len(createList) <= 10:
                 respText = f"您輸入的資料為：[[{text}]], 如需修改請點選下方按鈕"
                 bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("修改", callback_data = "createcamera_datacheck:" + stepCreate)]
                 ]), parse_mode="Markdown")
-                # 如果創建列表已經有九筆資料, 將資料傳入cameraData_showlist函式
-                if len(createList) == 9:
+                # 如果創建列表已經有十筆資料, 將資料傳入cameraData_showlist函式
+                if len(createList) == 10:
                     cameraData_showlist(update.message.chat_id)
                 return
         # 修改 攝像機 功能
@@ -1311,10 +1345,10 @@ def reply_handler(bot, update):
 
     elif (text in ["機房門禁", "\U0001F3C3\n機房門禁"]):
         respText = "請選擇機房人員進出年份～"
-        # 設定基底年份
-        base_year = 2020
         # 獲取當前年份
         max_year = int(str(datetime.date.today()).split("-")[0])
+        # 設定基底年份
+        base_year = max_year - 1
         # 迴圈拋出年份按鈕
         bot.send_message(chat_id=update.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(str(count_year), callback_data = "archive_month:" + "engineroom" + ":" + str(count_year))] for count_year in range(base_year, max_year+1)
@@ -1671,10 +1705,10 @@ def camera_select(bot, update):
     # 如果影像模式為調取存檔
     elif mode == "archive":
         respText = "請選擇影片存檔年份～"
-        # 設定基底年份
-        base_year = 2020
         # 獲取當前年份
         max_year = int(str(datetime.date.today()).split("-")[0])
+        # 設定基底年份
+        base_year = max_year - 1
         # 迴圈拋出年份按鈕
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(str(count_year), callback_data = "archive_month:" + device + ":" + str(count_year))] for count_year in range(base_year, max_year+1)
@@ -1848,10 +1882,10 @@ def createcamera_datacheck(bot, update):
         # 測試step是否可轉為整數
         int(step)
     except:
-        # 如果不能轉為整數, 代表step的資料為最後確認
+        # 如果不能轉為整數, 代表step的資料為"final_check"最後確認
         respText = "資料已傳送, 請等待Server端進行資料驗證～"
         # upsert新的資料表, 用來存使用者傳過去的攝像機資料, 本機端再抓出來驗證
-        dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "account":createList[4], "pin_code":createList[5], "url":createList[6], "fps":createList[7], "chat_id":update.callback_query.message.chat_id}}, upsert=True)
+        dbCameraCreate.update_one({"feature":"datapost"}, {"$set":{"status":"1", "name":createList[0], "location":createList[1], "ip":createList[2], "port":createList[3], "account":createList[4], "pin_code":createList[5], "url":createList[6], "fps":createList[7], "storage_space":createList[8], "nfs_dir":createList[9], "chat_id":update.callback_query.message.chat_id}}, upsert=True)
         # 匯入創建攝像機模式全域變數
         global cameraCreate
         # 關閉新增攝像機模式
@@ -1878,12 +1912,23 @@ def createcamera_datacheck(bot, update):
         bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
-# 帳號密碼留空(創建攝像機) 按鈕鍵盤 callback
-def createcamera_datanull(bot, update):
+# 其他按鈕(創建攝像機) 按鈕鍵盤 callback
+def createcamera_otherbutton(bot, update):
+    mode = update.callback_query.data.split(':')[1]
+    # 創建攝像機當前資料清單
     global createList
-    createList.append("null") # 帳號
-    createList.append("null") # 密碼
-    respText = "請輸入攝像機URL(開頭要加[/]斜線前綴)～"
+    # 如果使用者帳號密碼為空
+    if mode == "null":
+        # 資料清單加入兩個空值
+        createList.append("null") # 帳號
+        createList.append("null") # 密碼
+        # 創建攝像機步驟跳到輸入URL
+        respText = "帳號密碼為空值, 請輸入攝像機URL(開頭要加[/]斜線前綴)～"
+    # 如果最大存檔容量為預設
+    elif mode == "default_GB":
+        # 資料清單加入預設容量(400)
+        createList.append("400") # 最大存檔容量
+        respText = "最大存檔容量為400GB, 請輸入錄影檔存檔位址(NFS資料夾名稱)～"
     bot.send_message(chat_id=update.callback_query.message.chat_id, text=respText, parse_mode="Markdown")
     return
 
@@ -1918,7 +1963,7 @@ updater.dispatcher.add_handler(CallbackQueryHandler(archive_hour, pattern=r'arch
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_all, pattern=r'archive_all'))
 updater.dispatcher.add_handler(CallbackQueryHandler(archive_check, pattern=r'archive_check'))
 updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_datacheck, pattern=r'createcamera_datacheck'))
-updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_datanull, pattern=r'createcamera_datanull'))
+updater.dispatcher.add_handler(CallbackQueryHandler(createcamera_otherbutton, pattern=r'createcamera_otherbutton'))
 
 TOKEN = config['TELEGRAM']['ACCESS_TOKEN']
 PORT = int(os.environ.get('PORT', '8443'))
