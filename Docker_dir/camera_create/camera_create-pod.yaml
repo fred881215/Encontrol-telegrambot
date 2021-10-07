@@ -6,6 +6,21 @@ metadata:
   labels:
     app: camera-create
 spec:
+  serviceAccountName: "user"
   containers:
   - image: bydufish/camera_create
     name: camera-create
+    volumeMounts:
+    - name: kubectl-binary
+      mountPath: /usr/bin/kubectl
+      readOnly: true
+    - name: kubectl-config
+      mountPath: /etc/kubenetes/admin.conf
+      readOnly: true
+  volumes:
+  - name: kubectl-binary
+    hostPath:
+      path: /usr/bin/kubectl
+  - name: kubectl-config
+    hostPath:
+      path: /etc/kubenetes/admin.conf
