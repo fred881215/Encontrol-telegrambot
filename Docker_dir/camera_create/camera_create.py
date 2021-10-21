@@ -1,4 +1,3 @@
-from kubernetes import client, config as kubeconfig, utils
 import telegram
 from pymongo import MongoClient
 import configparser
@@ -22,10 +21,6 @@ dbCameraControl = myMongoDb['cameraControl']
 dbTelegramBot_Token = myMongoDb['TelegramBot_Token']
 TGToken = dbTelegramBot_Token.find_one()
 bot = telegram.Bot(token=(TGToken["token"]))
-
-# 連通K8s client
-kubeconfig.load_incluster_config()
-k8s_client = client.ApiClient()
 
 # 攝像機位址連接測試
 def socket_connection(device_ip, device_port):
@@ -52,8 +47,8 @@ def main():
             if result == 0: 
                 respText = "攝像機新增完成～"
                 # 新增攝像機資料, 編號自動遞增
-                # count_list = len([i for i in dbCameraControl.find()])
-                # dbCameraControl.update_one({"device_number":str(count_list+1)}, {"$set":{"status":"0", "device_name":request["name"], "device_location":request["location"], "device_ip":request["ip"], "device_port":request["port"], "account":request["account"], "pin_code":request["pin_code"], "url":request["url"], "fps":request["fps"], "storage_space":request["storage_space"], "nfs_dir":request["nfs_dir"], "video_second":"", "chat_id":"", "connection":"0"}}, upsert=True)
+                count_list = len([i for i in dbCameraControl.find()])
+                dbCameraControl.update_one({"device_number":str(count_list+1)}, {"$set":{"status":"0", "device_name":request["name"], "device_location":request["location"], "device_ip":request["ip"], "device_port":request["port"], "account":request["account"], "pin_code":request["pin_code"], "url":request["url"], "fps":request["fps"], "storage_space":request["storage_space"], "nfs_dir":request["nfs_dir"], "video_second":"", "chat_id":"", "connection":"0"}}, upsert=True)
                 # 設定串流Yaml檔名
                 filename = "fetchcron.yaml"
                 # 判斷Rtsp Url格式
@@ -126,7 +121,7 @@ spec:\n\
             - name: NAME\n\
               value: "{request["nfs_dir"]}"\n\
             - name: KSI\n\
-              value: {request["storage_space"]}\n\
+              value: "{request["storage_space"]}"\n\
             command: ["/bin/bash","-c"]\n\
             args: ["bash /var/capture/delete.sh $STOREPATH $NAME $KSI"]\n\
           restartPolicy: OnFailure\n\
@@ -140,10 +135,8 @@ spec:\n\
                 # 部署修改後的兩個Yaml檔
                 filename = "fetchcron.yaml"
                 os.system("kubectl apply -f " + filename)
-                # utils.create_from_yaml(k8s_client, filename)
                 filename = "deletecron.yaml"
                 os.system("kubectl apply -f " + filename)
-                # utils.create_from_yaml(k8s_client, filename)
             else:
                 respText = "該位址無法連通, 請修正後重新嘗試～"
             # 測試結果回傳給使用者
