@@ -1,6 +1,5 @@
 telegram機器人: app.py
-本地服務: Dockfile
-api伺服器: capture_api.py
+本地服務: Docker_Dir/
 
 pip install python-telegram-bot
 pip install pymongo
@@ -27,11 +26,4 @@ Linux NFS 掛載
   
   !解掛載:
     umount /mnt/telegram
-  
-Show mount:
-  root@sdn-k8s-b3-1:~# ls /mnt/telegram
-    2706_1  2706_2
-  root@sdn-k8s-b3-1:~# ls /mnt/telegram/2706_1/
-    20201106PM  20201113PM  20201120PM  20201128AM 
-  root@sdn-k8s-b3-1:~# ls /mnt/telegram/2706_1/20201106PM/
-    2706_1-20201106-174746-1604656066.mp4  2706_1-20201106-184924-1604659764.mp4
+ 
