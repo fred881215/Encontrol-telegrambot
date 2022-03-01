@@ -1,4 +1,4 @@
-添加影像相關功能的 IMAC 機房環控系統，使用 Telegram Bot 作為使用者介面，Heroku 作為託管平台，MongoDB Atlas 作為雲端資料庫，如需改動請至 config.ini 修改設定。
+添加影像相關功能的 IMAC 機房環控系統，主要使用 Telegram Bot，Heroku 作為託管平台，MongoDB Atlas 作為雲端資料庫，如需改動請至 config.ini 修改設定。
 使用前開啟 Heroku 服務並部署程式碼，並在本地端運行 Docker_Dir/ 底下的四個本地服務，可以下載 Docker Hub 上 bydufish/(本地服務資料夾名稱) 的映像檔並背景運行。
 
 Telegram Bot 機器人: app,py
