@@ -3,7 +3,7 @@
 
 Telegram Bot 機器人: app,py
 本地端服務: Docker_Dir/*
-Python 套件清單: config.ini
+使用套件清單: Pipfile
 
 監控錄影檔留存在 IMAC NFS Server，使用 Docker 映像檔部署本地服務時容器內部會自動掛載。
 NFS Server 有開啟白名單，部署本地服務的伺服器需連通 2706 區域網路並加入白名單
@@ -25,4 +25,3 @@ Sysnology NAS 設定:
   
 解除掛載指令:
     umount /mnt/telegram
- 
